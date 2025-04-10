@@ -1,13 +1,21 @@
 import os
+from dotenv import load_dotenv
+load_dotenv() 
 from flask import Flask, render_template, request, session, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from openai import OpenAI
 import logging
 import json
-
 logging.basicConfig(level=logging.DEBUG)
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+# Check for API key in environment or use a placeholder for development
+openai_api_key = os.environ.get("OPENAI_API_KEY")
+if not openai_api_key:
+    print("WARNING: OPENAI_API_KEY environment variable not set. Using mock responses for development.")
+    # Set to None to handle mock responses later
+    openai_api_key = None
+
+client = OpenAI(api_key=openai_api_key)
 
 class Base(DeclarativeBase):
     pass
@@ -150,6 +158,32 @@ def analyze_responses(answers):
     ])
 
     try:
+        # If API key is not available, return mock response
+        if not openai_api_key:
+            mock_analysis = {
+                "work_style": {
+                    "description": "Structured and focused work environment",
+                    "explanation": "Based on your responses, you prefer a clear schedule and defined tasks."
+                },
+                "environment": {
+                    "description": "Quiet, low-distraction workspace",
+                    "explanation": "You indicated a preference for spaces that allow concentration."
+                },
+                "interaction_level": {
+                    "description": "Limited but meaningful social interaction",
+                    "explanation": "Your answers suggest you work best with focused collaboration."
+                },
+                "task_preference": {
+                    "description": "Detail-oriented analytical tasks",
+                    "explanation": "You show a strong preference for tasks requiring precision and focus."
+                },
+                "accommodations": {
+                    "description": "Flexibility in work schedule and environment",
+                    "explanation": "Your responses indicate you benefit from customized work arrangements."
+                }
+            }
+            return format_analysis(mock_analysis)
+
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
@@ -157,7 +191,14 @@ def analyze_responses(answers):
         )
 
         analysis = json.loads(response.choices[0].message.content)
-        return f"""
+        return format_analysis(analysis)
+    except Exception as e:
+        logging.error(f"Error analyzing responses: {e}")
+        return "We encountered an error analyzing your responses. Please try again."
+
+def format_analysis(analysis):
+    """Format the analysis data into HTML"""
+    return f"""
 <div class='analysis-section'>
     <h3>Work Style</h3>
     <p class="mb-2"><strong>{analysis['work_style']['description']}</strong></p>
@@ -180,9 +221,6 @@ def analyze_responses(answers):
     <p class="text-muted mb-4">{analysis['accommodations']['explanation']}</p>
 </div>
 """
-    except Exception as e:
-        logging.error(f"Error analyzing responses: {e}")
-        return "We encountered an error analyzing your responses. Please try again."
 
 def get_job_recommendations(analysis):
     """Get job recommendations based on user preferences"""
