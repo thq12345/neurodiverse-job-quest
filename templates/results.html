@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="results-container">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <h1 class="display-4 mb-4">Your Results</h1>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h2 class="h4 mb-3">Work Environment Analysis</h2>
+                    <div class="analysis-content">
+                        {{ analysis|safe }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="h4 mb-3">Recommended Job Matches</h2>
+                    
+                    {% for job in recommendations %}
+                    <div class="job-card mb-3 p-3 border rounded">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h3 class="h5 mb-1">{{ job.title }}</h3>
+                                <p class="mb-1">{{ job.company }} - {{ job.location }}</p>
+                                <p class="text-muted small mb-2">{{ job.reasoning }}</p>
+                            </div>
+                            <div class="match-score">
+                                <span class="badge bg-{{ 'success' if job.match_score >= 80 else 'warning' if job.match_score >= 60 else 'secondary' }}">
+                                    {{ job.match_score }}% Match
+                                </span>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <a href="{{ job.url }}" class="btn btn-outline-primary btn-sm" target="_blank">
+                                <i data-feather="external-link" class="feather-sm me-1"></i>View Job
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <a href="{{ url_for('welcome') }}" class="btn btn-primary">
+                    Start New Assessment
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

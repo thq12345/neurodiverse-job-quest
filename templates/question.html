@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="question-container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="progress-wrapper">
+                <div class="progress-label mb-2">
+                    Question {{ question.id }} of 5
+                </div>
+                <div class="progress">
+                    <div class="progress-bar" 
+                         role="progressbar" 
+                         style="width: {{ progress }}%" 
+                         aria-valuenow="{{ progress }}" 
+                         aria-valuemin="0" 
+                         aria-valuemax="100">
+                    </div>
+                </div>
+            </div>
+
+            <div class="question-card">
+                <div class="question-header mb-4">
+                    <h2 class="question-title display-6">{{ question.text }}</h2>
+                </div>
+
+                <form method="POST" action="{{ url_for('question', question_id=question.id) }}">
+                    <div class="options-container">
+                        {% for option_id, option_text in question.options %}
+                        <div class="option-item mb-3">
+                            <input class="form-check-input visually-hidden" 
+                                   type="radio" 
+                                   name="answer" 
+                                   id="option{{ option_id }}" 
+                                   value="{{ option_id }}">
+                            <label class="form-check-label option-label" for="option{{ option_id }}">
+                                {{ option_text }}
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mt-4 text-center">
+                        <button type="submit" class="btn btn-primary btn-lg px-5">
+                            {{ 'Next' if question.id < 5 else 'See Results' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

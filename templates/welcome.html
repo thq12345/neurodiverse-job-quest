@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="welcome-container">
+    <div class="row justify-content-center">
+        <div class="col-md-10 text-left">
+            <div class="hero-section mb-5">
+                <div class="purple-badge mb-3">In today's competitive world</div>
+                <h1 class="display-3 mb-4">The Journey To<br>A Fulfilling Career</h1>
+                <p class="lead mb-4">
+                    We understand that everyone has unique preferences and needs in their work environment. 
+                    This tool will help match you with job opportunities that align with your specific preferences.
+                </p>
+                <div class="cta-buttons">
+                    <a href="{{ url_for('question', question_id=1) }}" 
+                       class="btn btn-primary btn-lg">Find Your Job</a>
+                    <a href="#how-it-works" 
+                       class="btn btn-outline-secondary btn-lg ms-3">Learn More</a>
+                </div>
+            </div>
+
+            <div class="stats-section mb-5">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-number">154K</div>
+                            <div class="stat-label">Available Jobs</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-number">20K</div>
+                            <div class="stat-label">Career Paths</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-number">95%</div>
+                            <div class="stat-label">Match Rate</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="how-it-works" class="process-section">
+                <h2 class="h3 mb-4">How It Works</h2>
+                <div class="process-steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3 class="h5">Complete Assessment</h3>
+                            <p>Answer 5 simple questions about your work preferences.</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3 class="h5">AI Analysis</h3>
+                            <p>Our AI analyzes your responses to understand your ideal work environment.</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3 class="h5">Get Matched</h3>
+                            <p>Receive personalized job recommendations that match your preferences.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
