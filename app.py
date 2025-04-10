@@ -1,6 +1,12 @@
 import os
 from dotenv import load_dotenv
 load_dotenv() 
+
+langtrace_api_key = os.environ.get("LANGTRACE_API_KEY")
+from langtrace_python_sdk import langtrace
+langtrace.init(api_key = langtrace_api_key)
+
+
 from flask import Flask, render_template, request, session, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
