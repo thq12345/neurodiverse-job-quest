@@ -6,7 +6,7 @@
         <div class="col-md-8">
             <div class="progress-wrapper">
                 <div class="progress-label mb-2">
-                    Question {{ question.id }} of 5
+                    Question {{ question.id }} of 6
                 </div>
                 <div class="progress">
                     <div class="progress-bar" 
@@ -14,8 +14,7 @@
                          style="width: {{ progress }}%" 
                          aria-valuenow="{{ progress }}" 
                          aria-valuemin="0" 
-                         aria-valuemax="100">
-                    </div>
+                         aria-valuemax="100"></div>
                 </div>
             </div>
 
@@ -25,6 +24,12 @@
                 </div>
 
                 <form method="POST" action="{{ url_for('question', question_id=question.id) }}">
+                    {% if question.type == 'free_response' %}
+                    <div class="form-group mb-4">
+                        <textarea class="form-control" name="free_response" id="free_response" rows="5" 
+                                  placeholder="Share any additional information that might help us understand your needs better..."></textarea>
+                    </div>
+                    {% else %}
                     <div class="options-container">
                         {% for option_id, option_text in question.options %}
                         <div class="option-item mb-3">
@@ -39,10 +44,11 @@
                         </div>
                         {% endfor %}
                     </div>
+                    {% endif %}
 
                     <div class="mt-4 text-center">
                         <button type="submit" class="btn btn-primary btn-lg px-5">
-                            {{ 'Next' if question.id < 5 else 'See Results' }}
+                            {{ 'Next' if question.id < 6 else 'See Results' }}
                         </button>
                     </div>
                 </form>
