@@ -13,11 +13,37 @@ from sqlalchemy.orm import DeclarativeBase
 from openai import OpenAI
 import logging
 import json
-logging.basicConfig(level=logging.DEBUG)
+import sys
+
+# ===== Logging Configuration =====
+# Configure logging to show application messages but suppress framework noise
+logging.basicConfig(level=logging.INFO)
+logging.getLogger('werkzeug').setLevel(logging.ERROR)  # Suppress Flask/Werkzeug logs
+logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)  # Suppress SQL logs
+
+# Create custom app logger with distinctive formatting
+console_handler = logging.StreamHandler(sys.stdout)
+formatter = logging.Formatter('\n>>> APP LOG: %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+app_logger = logging.getLogger('app')
+app_logger.setLevel(logging.DEBUG)
+app_logger.addHandler(console_handler)
+app_logger.propagate = False  # Prevent duplicate logs
+
+# Helper function for debug logging
+def debug(message, value=None):
+    """Log a debug message with optional value inspection"""
+    if value is not None:
+        app_logger.debug(f"{message}: {value}")
+    else:
+        app_logger.debug(message)
+    sys.stdout.flush()  # Force immediate output
+# ===== End Logging Configuration =====
+
 # Check for API key in environment or use a placeholder for development
 openai_api_key = os.environ.get("OPENAI_API_KEY")
 if not openai_api_key:
-    print("WARNING: OPENAI_API_KEY environment variable not set. Using mock responses for development.")
+    app_logger.warning("OpenAI API key not found - using mock responses for development")
     # Set to None to handle mock responses later
     openai_api_key = None
 
@@ -31,6 +57,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY") or "neurodiversity_app_secret"
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///app.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
 db.init_app(app)
 
 questions = [
@@ -76,6 +103,11 @@ questions = [
             ("A", "Yes"),
             ("B", "No")
         ]
+    },
+    {
+        "id": 6,
+        "text": "Is there anything else we should know about you?",
+        "type": "free_response"
     }
 ]
 
@@ -90,21 +122,40 @@ def question(question_id):
     if not (1 <= question_id <= len(questions)):
         return redirect(url_for("welcome"))
 
+    debug(f"Processing question {question_id}, method: {request.method}")
+    
     if request.method == "POST":
-        answer = request.form.get("answer")
+        debug("Form data", request.form)
+        
+        if 'type' in questions[question_id-1] and questions[question_id-1]['type'] == 'free_response':
+            answer = request.form.get("free_response")
+            app_logger.info(f"Question {question_id} (Free Response): {answer}")
+        else:
+            answer = request.form.get("answer")
+            if answer:
+                option_text = next((opt[1] for opt in questions[question_id-1]["options"] if opt[0] == answer), None)
+                app_logger.info(f"Question {question_id} (Multiple Choice): Option {answer} - {option_text}")
+            
         if answer:
             # Store answer and redirect
             session[f"q{question_id}"] = answer
+            debug(f"Answer saved for question {question_id}")
 
-            # Move to next question or results
+            # Determine next step (next question or results)
+            next_step = "results" if question_id >= len(questions) else f"question {question_id + 1}"
+            debug(f"Redirecting to {next_step}")
+            
             if question_id < len(questions):
                 return redirect(url_for("question", question_id=question_id + 1))
             return redirect(url_for("results"))
+        else:
+            debug("No answer provided")
 
     # GET request - show question
     current_question = questions[question_id - 1]
     progress = (question_id / len(questions)) * 100
-
+    
+    debug(f"Rendering question template for question {question_id}")
     return render_template(
         "question.html",
         question=current_question,
@@ -113,18 +164,75 @@ def question(question_id):
 
 @app.route("/results")
 def results():
+    debug("Results route called")
+    
+    # Verify all questions were answered
     if not all(f"q{i+1}" in session for i in range(len(questions))):
+        debug("Missing required answers, redirecting to welcome")
         return redirect(url_for("welcome"))
+
+    debug("Session data verification started")
+    
+    # Log all session data for verification
+    app_logger.info("\n*** SESSION DATA VERIFICATION ***")
+    
+    for i in range(len(questions)):
+        question_key = f"q{i+1}"
+        if question_key in session:
+            question_text = questions[i]["text"]
+            answer = session[question_key]
+            
+            # Format log message based on question type
+            if 'type' in questions[i] and questions[i]['type'] == 'free_response':
+                app_logger.info(f"Q{i+1}: {question_text} - Answer: {answer}")
+            else:
+                option_text = next((opt[1] for opt in questions[i]["options"] if opt[0] == answer), "Unknown")
+                app_logger.info(f"Q{i+1}: {question_text} - Option: {answer} - {option_text}")
+                
+    app_logger.info("*** END SESSION DATA ***")
 
     # Prepare answers for AI analysis
     answers = []
     for i, q in enumerate(questions):
         answer_key = session[f"q{i+1}"]
-        answer_text = next(opt[1] for opt in q["options"] if opt[0] == answer_key)
+        if 'type' in q and q['type'] == 'free_response':
+            answer_text = answer_key  # Use the free response text directly
+        else:
+            answer_text = next(opt[1] for opt in q["options"] if opt[0] == answer_key)
         answers.append(f"Q: {q['text']}\nA: {answer_text}")
 
     analysis = analyze_responses(answers)
     recommendations = get_job_recommendations(analysis)
+    
+    # Store in database
+    try:
+        debug("Starting database storage process")
+        from models import Assessment
+        
+        # Create new assessment record
+        assessment = Assessment(
+            q1_answer=session.get('q1', ''),
+            q2_answer=session.get('q2', ''),
+            q3_answer=session.get('q3', ''),
+            q4_answer=session.get('q4', ''),
+            q5_answer=session.get('q5', ''),
+            q6_answer=session.get('q6', ''),
+            analysis=str(analysis)
+        )
+        
+        # Add to database and commit
+        db.session.add(assessment)
+        db.session.commit()
+        
+        debug(f"Database record created with ID: {assessment.id}")
+        
+        # Log the successful database operation
+        app_logger.info(f"Assessment saved to database (ID: {assessment.id})")
+        app_logger.info(f"Free response answer: {assessment.q6_answer}")
+    except Exception as e:
+        # Log database errors
+        app_logger.error(f"Database error: {str(e)}")
+        debug(f"Database operation failed: {str(e)}")
 
     return render_template(
         "results.html",
@@ -133,6 +241,8 @@ def results():
     )
 
 def analyze_responses(answers):
+    debug("Starting response analysis")
+    
     # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
     prompt = "\n".join([
         "Based on these assessment responses, provide a detailed analysis of the ideal",
@@ -158,6 +268,10 @@ def analyze_responses(answers):
         "    description: any specific needs,",
         "    explanation: reasoning behind these accommodations",
         "  }",
+        "- additional_insights: {",
+        "    description: insights from additional information provided,",
+        "    explanation: how this further informs their work preferences",
+        "  }",
         "",
         "Here are the responses:",
         *answers
@@ -166,6 +280,7 @@ def analyze_responses(answers):
     try:
         # If API key is not available, return mock response
         if not openai_api_key:
+            debug("Using mock analysis (no API key found)")
             mock_analysis = {
                 "work_style": {
                     "description": "Structured and focused work environment",
@@ -186,10 +301,15 @@ def analyze_responses(answers):
                 "accommodations": {
                     "description": "Flexibility in work schedule and environment",
                     "explanation": "Your responses indicate you benefit from customized work arrangements."
+                },
+                "additional_insights": {
+                    "description": "Personalized feedback based on your additional information",
+                    "explanation": "Your additional comments provide context for better understanding your needs."
                 }
             }
             return format_analysis(mock_analysis)
 
+        debug("Calling OpenAI API for analysis")
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
@@ -197,9 +317,11 @@ def analyze_responses(answers):
         )
 
         analysis = json.loads(response.choices[0].message.content)
+        debug("Analysis generated successfully")
         return format_analysis(analysis)
     except Exception as e:
-        logging.error(f"Error analyzing responses: {e}")
+        app_logger.error(f"Error analyzing responses: {str(e)}")
+        debug(f"Analysis error: {str(e)}")
         return "We encountered an error analyzing your responses. Please try again."
 
 def format_analysis(analysis):
@@ -225,11 +347,17 @@ def format_analysis(analysis):
     <h3>Accommodations</h3>
     <p class="mb-2"><strong>{analysis['accommodations']['description']}</strong></p>
     <p class="text-muted mb-4">{analysis['accommodations']['explanation']}</p>
+    
+    <h3>Additional Insights</h3>
+    <p class="mb-2"><strong>{analysis.get('additional_insights', {}).get('description', 'No additional insights')}</strong></p>
+    <p class="text-muted mb-4">{analysis.get('additional_insights', {}).get('explanation', '')}</p>
 </div>
 """
 
 def get_job_recommendations(analysis):
     """Get job recommendations based on user preferences"""
+    debug("Generating job recommendations")
+    
     try:
         # Since job scraping isn't working, provide sample jobs
         sample_jobs = [
@@ -315,10 +443,12 @@ def get_job_recommendations(analysis):
             }
         ]
 
+        debug(f"Generated {len(sample_jobs)} job recommendations")
         return sample_jobs
 
     except Exception as e:
-        logging.error(f"Error getting job recommendations: {e}")
+        app_logger.error(f"Error generating job recommendations: {str(e)}")
+        debug(f"Job recommendation error: {str(e)}")
         return []
 
 with app.app_context():
