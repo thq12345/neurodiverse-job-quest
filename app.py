@@ -107,51 +107,38 @@ def welcome():
     session.clear()
     return render_template("welcome.html")
 
-@app.route("/question/<int:question_id>", methods=["GET", "POST"])
-def question(question_id):
-    # Basic validation
-    if not (1 <= question_id <= len(questions)):
-        return redirect(url_for("welcome"))
+@app.route("/questionnaire", methods=["GET"])
+def questionnaire():
+    debug("Rendering questionnaire page")
+    return render_template("question.html", questions=questions)
 
-    debug(f"Processing question {question_id}, method: {request.method}")
+@app.route("/submit_questionnaire", methods=["POST"])
+def submit_questionnaire():
+    debug("Questionnaire submitted")
+    debug("Form data", request.form)
     
-    if request.method == "POST":
-        debug("Form data", request.form)
+    # Verify all questions are answered
+    if not all(f"q{i+1}" in request.form for i in range(len(questions))):
+        debug("Missing required answers")
+        return redirect(url_for("questionnaire"))
+    
+    # Store answers in session
+    for i in range(len(questions)):
+        question_key = f"q{i+1}"
+        session[question_key] = request.form.get(question_key)
         
-        if 'type' in questions[question_id-1] and questions[question_id-1]['type'] == 'free_response':
-            answer = request.form.get("free_response")
-            app_logger.info(f"Question {question_id} (Free Response): {answer}")
+        # Log the answer
+        question_text = questions[i]["text"]
+        answer = session[question_key]
+        
+        # Format log message based on question type
+        if 'type' in questions[i] and questions[i]['type'] == 'free_response':
+            app_logger.info(f"Q{i+1}: {question_text} - Answer: {answer}")
         else:
-            answer = request.form.get("answer")
-            if answer:
-                option_text = next((opt[1] for opt in questions[question_id-1]["options"] if opt[0] == answer), None)
-                app_logger.info(f"Question {question_id} (Multiple Choice): Option {answer} - {option_text}")
-            
-        if answer:
-            # Store answer and redirect
-            session[f"q{question_id}"] = answer
-            debug(f"Answer saved for question {question_id}")
-
-            # Determine next step (next question or results)
-            next_step = "results" if question_id >= len(questions) else f"question {question_id + 1}"
-            debug(f"Redirecting to {next_step}")
-            
-            if question_id < len(questions):
-                return redirect(url_for("question", question_id=question_id + 1))
-            return redirect(url_for("results"))
-        else:
-            debug("No answer provided")
-
-    # GET request - show question
-    current_question = questions[question_id - 1]
-    progress = (question_id / len(questions)) * 100
+            option_text = next((opt[1] for opt in questions[i]["options"] if opt[0] == answer), "Unknown")
+            app_logger.info(f"Q{i+1}: {question_text} - Option: {answer} - {option_text}")
     
-    debug(f"Rendering question template for question {question_id}")
-    return render_template(
-        "question.html",
-        question=current_question,
-        progress=progress
-    )
+    return redirect(url_for("results"))
 
 @app.route("/results")
 def results():
@@ -159,8 +146,8 @@ def results():
     
     # Verify all questions were answered
     if not all(f"q{i+1}" in session for i in range(len(questions))):
-        debug("Missing required answers, redirecting to welcome")
-        return redirect(url_for("welcome"))
+        debug("Missing required answers, redirecting to questionnaire")
+        return redirect(url_for("questionnaire"))
 
     debug("Session data verification started")
     
