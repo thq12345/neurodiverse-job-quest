@@ -6,7 +6,6 @@ class Assessment(db.Model):
     q2_answer = db.Column(db.String(1))
     q3_answer = db.Column(db.String(1))
     q4_answer = db.Column(db.String(1))
-    q5_answer = db.Column(db.String(1))
-    q6_answer = db.Column(db.Text)  # Free response text can be longer
+    q5_answer = db.Column(db.Text)  # Free response text can be longer
     analysis = db.Column(db.Text)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
