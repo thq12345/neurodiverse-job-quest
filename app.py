@@ -15,6 +15,9 @@ import logging
 import json
 import sys
 
+# Import pre-computed analyses
+from analysis_templates import get_analysis_for_combination
+
 # ===== Logging Configuration =====
 # Configure logging to show application messages but suppress framework noise
 logging.basicConfig(level=logging.INFO)
@@ -220,6 +223,77 @@ def results():
 def analyze_responses(answers):
     debug("Starting response analysis")
     
+    # Extract the first 4 multiple-choice answers from the session (if available)
+    mc_answers = []
+    for i in range(4):  # First 4 questions are multiple choice
+        answer_key = f"q{i+1}"
+        if answer_key in session:
+            mc_answers.append(session[answer_key])
+        else:
+            mc_answers.append(None)
+    
+    # Check if we have all 4 multiple-choice answers
+    if all(mc_answers) and len(mc_answers) == 4:
+        debug("Using pre-computed analysis for multiple choice answers")
+        q1, q2, q3, q4 = mc_answers
+        pre_computed_analysis = get_analysis_for_combination(q1, q2, q3, q4)
+        
+        if pre_computed_analysis:
+            debug(f"Found pre-computed analysis for combination {q1}{q2}{q3}{q4}")
+            
+            # Get the free response answer (if provided)
+            free_response = session.get("q5", "")
+            
+            # If free response is provided, customize the additional insights
+            if free_response and free_response.strip():
+                debug("Customizing additional insights based on free response")
+                
+                # If we have an API key, we can use OpenAI to customize the additional insights
+                if openai_api_key:
+                    try:
+                        prompt = f"""
+                        Based on the user's additional information: "{free_response}"
+                        
+                        Please provide a brief, personalized insight about their work preferences.
+                        Format as a JSON object with these fields:
+                        - description: A concise title/summary (max 10 words)
+                        - explanation: How their additional information informs their work preferences (1-2 sentences)
+                        
+                        Response format:
+                        {{
+                            "description": "brief description",
+                            "explanation": "brief explanation"
+                        }}
+                        """
+                        
+                        response = client.chat.completions.create(
+                            model="gpt-4o",
+                            messages=[{"role": "user", "content": prompt}],
+                            response_format={"type": "json_object"}
+                        )
+                        
+                        custom_insights = json.loads(response.choices[0].message.content)
+                        pre_computed_analysis["additional_insights"] = custom_insights
+                    except Exception as e:
+                        # If there's an error, just use a generic additional insight
+                        app_logger.error(f"Error customizing additional insights: {str(e)}")
+                        pre_computed_analysis["additional_insights"] = {
+                            "description": "Additional information provided",
+                            "explanation": "You shared specific preferences that provide further context for your work environment needs."
+                        }
+                else:
+                    # Simple custom insight without API
+                    pre_computed_analysis["additional_insights"] = {
+                        "description": "Additional information provided",
+                        "explanation": "You shared specific preferences that provide further context for your work environment needs."
+                    }
+            
+            return format_analysis(pre_computed_analysis)
+    
+    # If we don't have pre-computed analysis (missing answers or combination not found),
+    # fall back to the original method
+    debug("No pre-computed analysis available, using standard analysis method")
+    
     # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
     prompt = "\n".join([
         "Based on these assessment responses, provide a detailed analysis of the ideal",
@@ -241,10 +315,6 @@ def analyze_responses(answers):
         "    description: type of tasks they excel at,",
         "    explanation: how this aligns with their answers",
         "  }",
-        "- accommodations: {",
-        "    description: any specific needs,",
-        "    explanation: reasoning behind these accommodations",
-        "  }",
         "- additional_insights: {",
         "    description: insights from additional information provided,",
         "    explanation: how this further informs their work preferences",
@@ -255,37 +325,15 @@ def analyze_responses(answers):
     ])
 
     try:
-        # If API key is not available, return mock response
+        # If API key is not available, we'll still use our pre-computed analyses
+        # The code that calls analyze_responses should already have checked for pre-computed analyses
+        # This section only runs if we couldn't find a matching pre-computed analysis
+        
         if not openai_api_key:
-            debug("Using mock analysis (no API key found)")
-            mock_analysis = {
-                "work_style": {
-                    "description": "Structured and focused work environment",
-                    "explanation": "Based on your responses, you prefer a clear schedule and defined tasks."
-                },
-                "environment": {
-                    "description": "Quiet, low-distraction workspace",
-                    "explanation": "You indicated a preference for spaces that allow concentration."
-                },
-                "interaction_level": {
-                    "description": "Limited but meaningful social interaction",
-                    "explanation": "Your answers suggest you work best with focused collaboration."
-                },
-                "task_preference": {
-                    "description": "Detail-oriented analytical tasks",
-                    "explanation": "You show a strong preference for tasks requiring precision and focus."
-                },
-                "accommodations": {
-                    "description": "Flexibility in work schedule and environment",
-                    "explanation": "Your responses indicate you benefit from customized work arrangements."
-                },
-                "additional_insights": {
-                    "description": "Personalized feedback based on your additional information",
-                    "explanation": "Your additional comments provide context for better understanding your needs."
-                }
-            }
-            return format_analysis(mock_analysis)
-
+            debug("No API key available and no matching pre-computed analysis found")
+            # Return a message asking the user to provide an API key
+            return "To generate a personalized analysis, please provide an OpenAI API key or ensure your answers match our pre-computed templates."
+        
         debug("Calling OpenAI API for analysis")
         response = client.chat.completions.create(
             model="gpt-4o",
@@ -320,10 +368,6 @@ def format_analysis(analysis):
     <h3>Task Preferences</h3>
     <p class="mb-2"><strong>{analysis['task_preference']['description']}</strong></p>
     <p class="text-muted mb-4">{analysis['task_preference']['explanation']}</p>
-
-    <h3>Accommodations</h3>
-    <p class="mb-2"><strong>{analysis['accommodations']['description']}</strong></p>
-    <p class="text-muted mb-4">{analysis['accommodations']['explanation']}</p>
     
     <h3>Additional Insights</h3>
     <p class="mb-2"><strong>{analysis.get('additional_insights', {}).get('description', 'No additional insights')}</strong></p>
