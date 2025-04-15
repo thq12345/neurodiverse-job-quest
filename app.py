@@ -74,8 +74,7 @@ questions = [
         "text": "What type of workspace do you find most comfortable?",
         "options": [
             ("A", "Quiet and private spaces"),
-            ("B", "Collaborative and open spaces"),
-            ("C", "A mix of both")
+            ("B", "Collaborative and open spaces")
         ]
     },
     {
@@ -98,14 +97,6 @@ questions = [
     },
     {
         "id": 5,
-        "text": "Do you require any specific accommodations in your workspace?",
-        "options": [
-            ("A", "Yes"),
-            ("B", "No")
-        ]
-    },
-    {
-        "id": 6,
         "text": "Is there anything else we should know about you?",
         "type": "free_response"
     }
@@ -216,7 +207,6 @@ def results():
             q3_answer=session.get('q3', ''),
             q4_answer=session.get('q4', ''),
             q5_answer=session.get('q5', ''),
-            q6_answer=session.get('q6', ''),
             analysis=str(analysis)
         )
         
@@ -228,7 +218,7 @@ def results():
         
         # Log the successful database operation
         app_logger.info(f"Assessment saved to database (ID: {assessment.id})")
-        app_logger.info(f"Free response answer: {assessment.q6_answer}")
+        app_logger.info(f"Free response answer: {assessment.q5_answer}")
     except Exception as e:
         # Log database errors
         app_logger.error(f"Database error: {str(e)}")
