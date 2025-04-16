@@ -24,10 +24,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Detailed, systematic projects with clear specifications",
             "explanation": "Your preference for detailed tasks suggests you excel in roles requiring precision and thoroughness."
-        },
-        "additional_insights": {
-            "description": "May excel in roles like data analysis, programming, or technical writing",
-            "explanation": "Your combination of preferences is well-suited to roles requiring deep focus and attention to detail."
         }
     },
     
@@ -48,10 +44,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Creative projects with clear boundaries and timelines",
             "explanation": "You excel at innovative work that still has defined parameters and structure."
-        },
-        "additional_insights": {
-            "description": "Well-suited for roles like graphic design, content creation, or UX design",
-            "explanation": "Your structured approach to creative work makes you ideal for production-oriented creative positions."
         }
     },
     
@@ -72,10 +64,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Mixed projects that combine analytical and creative elements",
             "explanation": "Your preference for balanced tasks suggests you enjoy work that engages both analytical and creative thinking."
-        },
-        "additional_insights": {
-            "description": "Well-suited for roles that blend technical and creative elements",
-            "explanation": "Your balanced preferences make you adaptable to positions like technical writing, product management, or research."
         }
     },
     
@@ -96,10 +84,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Detail-oriented projects that benefit from team input",
             "explanation": "You excel at detail-focused work that incorporates perspectives from collaborative efforts."
-        },
-        "additional_insights": {
-            "description": "Well-suited for quality assurance, collaborative research, or technical team roles",
-            "explanation": "Your combination of teamwork comfort and detail orientation is valuable in roles requiring precise collaborative output."
         }
     },
     
@@ -120,10 +104,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Creative projects enhanced through team contribution",
             "explanation": "You excel at creative work that benefits from multiple perspectives while maintaining clear direction."
-        },
-        "additional_insights": {
-            "description": "Well-suited for collaborative design, content production teams, or creative direction",
-            "explanation": "Your structured approach to creative teamwork is valuable in production-oriented creative environments."
         }
     },
     
@@ -146,10 +126,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Balanced projects that leverage team strengths in different areas",
             "explanation": "You excel at work that combines team input on both detailed and creative elements."
-        },
-        "additional_insights": {
-            "description": "Well-suited for product development, research teams, or multidisciplinary projects",
-            "explanation": "Your balanced preferences in a team context make you valuable for complex collaborative projects."
         }
     },
     
@@ -170,10 +146,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Detail-oriented projects requiring coordinated team effort",
             "explanation": "You excel at managing complex, detail-focused initiatives that require team coordination."
-        },
-        "additional_insights": {
-            "description": "Well-suited for technical project management, quality leadership, or research direction",
-            "explanation": "Your combination of leadership and detail orientation is valuable in roles requiring precise team output."
         }
     },
     
@@ -194,10 +166,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Creative projects requiring coordinated team innovation",
             "explanation": "You excel at guiding teams through creative challenges that benefit from structured leadership."
-        },
-        "additional_insights": {
-            "description": "Well-suited for creative direction, design team leadership, or innovation management",
-            "explanation": "Your combination of structured leadership and creative focus is valuable for driving innovative team output."
         }
     },
     
@@ -218,10 +186,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Balanced projects requiring cohesive team coordination",
             "explanation": "You excel at guiding teams through complex initiatives that require both analytical and creative approaches."
-        },
-        "additional_insights": {
-            "description": "Well-suited for product team leadership, research direction, or cross-functional management",
-            "explanation": "Your balanced leadership approach makes you valuable in roles requiring coordination of diverse work types."
         }
     },
     
@@ -242,10 +206,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Detail-oriented independent contributions to team projects",
             "explanation": "You excel at focused, precise work that feeds into broader team objectives."
-        },
-        "additional_insights": {
-            "description": "Well-suited for specialized technical roles within collaborative teams",
-            "explanation": "Your combination of structured, detail-oriented work in collaborative settings makes you valuable for specialized contributions."
         }
     },
     
@@ -266,10 +226,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Creative projects with independent execution in team context",
             "explanation": "You excel at creative work that allows you to contribute your unique vision to broader team initiatives."
-        },
-        "additional_insights": {
-            "description": "Well-suited for specialized creative roles in collaborative teams",
-            "explanation": "Your combination of structured independence and creative focus makes you valuable for distinctive contributions."
         }
     },
     
@@ -290,10 +246,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Balanced projects with independent execution in team framework",
             "explanation": "You excel at work that blends analytical and creative elements while allowing autonomous contribution."
-        },
-        "additional_insights": {
-            "description": "Well-suited for versatile specialist roles in collaborative settings",
-            "explanation": "Your balanced approach to independent work makes you valuable for multifaceted contributions to team goals."
         }
     },
     
@@ -314,10 +266,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Detail-oriented projects with collaborative execution",
             "explanation": "You excel at precise work that incorporates active team input and coordination."
-        },
-        "additional_insights": {
-            "description": "Well-suited for technical team roles requiring precision and collaboration",
-            "explanation": "Your combination of detailed focus and team orientation is valuable for collaborative technical work."
         }
     },
     
@@ -338,10 +286,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Creative projects with collaborative execution",
             "explanation": "You excel at innovative work that leverages team synergy within a structured framework."
-        },
-        "additional_insights": {
-            "description": "Well-suited for creative team roles in structured environments",
-            "explanation": "Your combination of creative focus and team orientation is valuable for innovative yet organized teams."
         }
     },
     
@@ -362,10 +306,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Balanced projects with integrated team execution",
             "explanation": "You excel at work that combines detailed and creative elements through cohesive team effort."
-        },
-        "additional_insights": {
-            "description": "Well-suited for versatile team roles in structured organizations",
-            "explanation": "Your balanced approach to teamwork makes you adaptable to diverse collaborative challenges."
         }
     },
     
@@ -386,10 +326,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Detail-oriented projects requiring coordinated team collaboration",
             "explanation": "You excel at managing complex, detail-focused initiatives in highly interactive team contexts."
-        },
-        "additional_insights": {
-            "description": "Well-suited for technical team leadership in collaborative organizations",
-            "explanation": "Your combination of detailed focus and team leadership makes you valuable for guiding precision-oriented teams."
         }
     },
     
@@ -410,10 +346,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Creative projects requiring coordinated team collaboration",
             "explanation": "You excel at managing innovative initiatives that harness collective creativity through structured guidance."
-        },
-        "additional_insights": {
-            "description": "Well-suited for creative team leadership in collaborative organizations",
-            "explanation": "Your combination of creative focus and team leadership makes you valuable for guiding innovation-oriented teams."
         }
     },
     
@@ -434,10 +366,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Balanced projects requiring versatile team coordination",
             "explanation": "You excel at guiding teams through initiatives that blend detailed and creative elements in collaborative contexts."
-        },
-        "additional_insights": {
-            "description": "Well-suited for diverse team leadership in structured collaborative organizations",
-            "explanation": "Your balanced leadership approach makes you valuable for directing multifaceted teams in interactive environments."
         }
     },
     
@@ -458,10 +386,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Detail-oriented projects with flexible execution",
             "explanation": "You excel at precision work when allowed to approach it with your own timing and rhythm."
-        },
-        "additional_insights": {
-            "description": "Well-suited for independent technical roles with flexible arrangements",
-            "explanation": "Your combination of detailed focus and schedule flexibility makes you ideal for precision work with autonomy."
         }
     },
     
@@ -482,10 +406,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Creative projects with flexible, independent execution",
             "explanation": "You excel at innovative work when allowed to approach it at your own pace and in your own way."
-        },
-        "additional_insights": {
-            "description": "Well-suited for independent creative roles with flexible arrangements",
-            "explanation": "Your combination of creative focus and schedule autonomy makes you ideal for innovation with freedom."
         }
     },
     
@@ -506,10 +426,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Balanced projects with flexible, independent execution",
             "explanation": "You excel at work that combines analytical and creative elements when allowed to approach it on your own terms."
-        },
-        "additional_insights": {
-            "description": "Well-suited for versatile independent roles with flexible arrangements",
-            "explanation": "Your balanced approach to tasks combined with schedule autonomy makes you adaptable to diverse work with freedom."
         }
     },
     
@@ -530,10 +446,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Detail-oriented projects with flexible team execution",
             "explanation": "You excel at precision work that incorporates team input while allowing for adaptable approaches."
-        },
-        "additional_insights": {
-            "description": "Well-suited for technical team roles with flexible arrangements",
-            "explanation": "Your combination of detailed focus and schedule flexibility makes you valuable for precision team work with autonomy."
         }
     },
     
@@ -554,10 +466,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Creative projects with flexible team execution",
             "explanation": "You excel at innovative work that harnesses team synergy while allowing for adaptable processes."
-        },
-        "additional_insights": {
-            "description": "Well-suited for creative team roles with flexible arrangements",
-            "explanation": "Your combination of creative collaboration and schedule autonomy makes you valuable for innovative team endeavors."
         }
     },
     
@@ -578,10 +486,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Balanced projects with flexible team execution",
             "explanation": "You excel at work that combines detailed and creative elements through team effort with adaptable approaches."
-        },
-        "additional_insights": {
-            "description": "Well-suited for versatile team roles with flexible arrangements",
-            "explanation": "Your balanced approach to teamwork combined with schedule autonomy makes you adaptable to diverse collaborative work."
         }
     },
     
@@ -602,10 +506,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Detail-oriented projects with flexible team leadership",
             "explanation": "You excel at guiding precise, detailed initiatives while allowing for adaptable execution methods."
-        },
-        "additional_insights": {
-            "description": "Well-suited for technical leadership roles with flexible arrangements",
-            "explanation": "Your combination of detailed leadership and schedule autonomy makes you valuable for precision-oriented team direction."
         }
     },
     
@@ -626,10 +526,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Creative projects with flexible team leadership",
             "explanation": "You excel at guiding innovative initiatives while allowing for adaptable creative processes."
-        },
-        "additional_insights": {
-            "description": "Well-suited for creative leadership roles with flexible arrangements",
-            "explanation": "Your combination of creative direction and schedule autonomy makes you valuable for innovation-focused team guidance."
         }
     },
     
@@ -650,10 +546,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Balanced projects with flexible team leadership",
             "explanation": "You excel at guiding initiatives that blend detailed and creative elements through adaptable direction styles."
-        },
-        "additional_insights": {
-            "description": "Well-suited for versatile leadership roles with flexible arrangements",
-            "explanation": "Your balanced approach to team leadership combined with schedule autonomy makes you effective for diverse team guidance."
         }
     },
     
@@ -674,10 +566,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Versatile projects that leverage collective team strengths",
             "explanation": "You excel at guiding teams through work that requires both analytical rigor and creative innovation."
-        },
-        "additional_insights": {
-            "description": "Excellent fit for executive roles, innovation leadership, or multidisciplinary team management",
-            "explanation": "Your balanced approach to flexible team leadership is ideal for dynamic, complex organizational environments."
         }
     },
     
@@ -698,10 +586,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Detail-oriented projects with flexible, independent execution",
             "explanation": "You excel at precision work when allowed to approach it with your own timing in collaborative contexts."
-        },
-        "additional_insights": {
-            "description": "Well-suited for specialized technical roles in dynamic organizations",
-            "explanation": "Your combination of detailed focus and limited interaction in collaborative settings makes you valuable for specialized contributions."
         }
     },
     
@@ -722,10 +606,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Creative projects with flexible, independent execution",
             "explanation": "You excel at innovative work when allowed to approach it with your own method and timing in stimulating contexts."
-        },
-        "additional_insights": {
-            "description": "Well-suited for specialized creative roles in dynamic organizations",
-            "explanation": "Your combination of creative focus and limited interaction in collaborative settings makes you valuable for distinctive contributions."
         }
     },
     
@@ -746,10 +626,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Balanced projects with flexible, independent execution",
             "explanation": "You excel at work combining analytical and creative elements when approached with your own timing in dynamic contexts."
-        },
-        "additional_insights": {
-            "description": "Well-suited for versatile specialist roles in dynamic organizations",
-            "explanation": "Your balanced approach to tasks with limited interaction in collaborative settings makes you adaptable to diverse needs."
         }
     },
     
@@ -770,10 +646,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Detail-oriented projects with flexible team execution",
             "explanation": "You excel at precision work that incorporates team synergy with adaptable methods and timing."
-        },
-        "additional_insights": {
-            "description": "Well-suited for technical team roles in dynamic organizations",
-            "explanation": "Your combination of detailed focus and team orientation in flexible arrangements makes you valuable for adaptive collaboration."
         }
     },
     
@@ -794,10 +666,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Creative projects with flexible collaborative execution",
             "explanation": "You excel at innovative work that harnesses collective creativity through adaptable team processes."
-        },
-        "additional_insights": {
-            "description": "Well-suited for creative team roles in dynamic organizations",
-            "explanation": "Your combination of creative focus and team orientation in flexible arrangements makes you valuable for innovative collaboration."
         }
     },
     
@@ -818,10 +686,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Balanced projects with flexible collaborative execution",
             "explanation": "You excel at work that combines detailed and creative elements through adaptable team processes."
-        },
-        "additional_insights": {
-            "description": "Well-suited for versatile team roles in dynamic organizations",
-            "explanation": "Your balanced approach to teamwork in flexible arrangements makes you adaptable to diverse collaborative challenges."
         }
     },
     
@@ -842,10 +706,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Detail-oriented projects with flexible team direction",
             "explanation": "You excel at guiding teams through precise initiatives with adaptable leadership approaches."
-        },
-        "additional_insights": {
-            "description": "Well-suited for technical leadership roles in dynamic organizations",
-            "explanation": "Your combination of detailed focus and team leadership in flexible arrangements makes you effective for adaptive technical direction."
         }
     },
     
@@ -866,10 +726,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Creative projects with flexible team direction",
             "explanation": "You excel at guiding teams through innovative initiatives with adaptable leadership approaches."
-        },
-        "additional_insights": {
-            "description": "Well-suited for creative leadership roles in dynamic organizations",
-            "explanation": "Your combination of creative focus and team leadership in flexible arrangements makes you effective for adaptive innovation direction."
         }
     },
     
@@ -890,10 +746,6 @@ analysis_templates = {
         "task_preference": {
             "description": "Versatile projects that leverage collective team strengths",
             "explanation": "You excel at guiding teams through work that requires both analytical rigor and creative innovation."
-        },
-        "additional_insights": {
-            "description": "Excellent fit for executive roles, innovation leadership, or multidisciplinary team management",
-            "explanation": "Your balanced approach to flexible team leadership is ideal for dynamic, complex organizational environments."
         }
     }
 }
