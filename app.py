@@ -269,7 +269,28 @@ def analyze_responses(answers):
                         response = client.chat.completions.create(
                             model="gpt-4o",
                             messages=[{"role": "user", "content": prompt}],
-                            response_format={"type": "json_object"}
+                            response_format={
+                                "type": "json_schema",
+                                "json_schema": {
+                                    "name": "additional_insights",
+                                    "strict": True,
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "description": {
+                                                "type": "string",
+                                                "description": "A concise title/summary (max 10 words)"
+                                            },
+                                            "explanation": {
+                                                "type": "string",
+                                                "description": "How additional information informs work preferences (1-2 sentences)"
+                                            }
+                                        },
+                                        "required": ["description", "explanation"],
+                                        "additionalProperties": False
+                                    }
+                                }
+                            }
                         )
                         
                         custom_insights = json.loads(response.choices[0].message.content)
@@ -285,7 +306,7 @@ def analyze_responses(answers):
                     # Simple custom insight without API
                     pre_computed_analysis["additional_insights"] = {
                         "description": "Additional information provided",
-                        "explanation": "You shared specific preferences that provide further context for your work environment needs."
+                        "explanation": "OPENAI API KEY NOT FOUND, UNABLE TO CUSTOMIZE ADDITIONAL INSIGHTS"
                     }
             
             return format_analysis(pre_computed_analysis)
@@ -338,7 +359,65 @@ def analyze_responses(answers):
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"}
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "work_analysis",
+                    "strict": True,
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "work_style": {
+                                "type": "object",
+                                "properties": {
+                                    "description": {"type": "string"},
+                                    "explanation": {"type": "string"}
+                                },
+                                "required": ["description", "explanation"],
+                                "additionalProperties": False
+                            },
+                            "environment": {
+                                "type": "object",
+                                "properties": {
+                                    "description": {"type": "string"},
+                                    "explanation": {"type": "string"}
+                                },
+                                "required": ["description", "explanation"],
+                                "additionalProperties": False
+                            },
+                            "interaction_level": {
+                                "type": "object",
+                                "properties": {
+                                    "description": {"type": "string"},
+                                    "explanation": {"type": "string"}
+                                },
+                                "required": ["description", "explanation"],
+                                "additionalProperties": False
+                            },
+                            "task_preference": {
+                                "type": "object",
+                                "properties": {
+                                    "description": {"type": "string"},
+                                    "explanation": {"type": "string"}
+                                },
+                                "required": ["description", "explanation"],
+                                "additionalProperties": False
+                            },
+                            "additional_insights": {
+                                "type": "object",
+                                "properties": {
+                                    "description": {"type": "string"},
+                                    "explanation": {"type": "string"}
+                                },
+                                "required": ["description", "explanation"],
+                                "additionalProperties": False
+                            }
+                        },
+                        "required": ["work_style", "environment", "interaction_level", "task_preference", "additional_insights"],
+                        "additionalProperties": False
+                    }
+                }
+            }
         )
 
         analysis = json.loads(response.choices[0].message.content)
