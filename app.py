@@ -18,6 +18,8 @@ import boto3
 import re
 import io
 import PyPDF2
+from response_evaluator import ResponseEvaluator
+from job_analyzer import JobAnalyzer
 
 # Initialize AWS session
 aws_session = boto3.Session(
@@ -256,240 +258,95 @@ def analyze_responses(answers):
         else:
             mc_answers.append(None)
     
-    # Check if we have all 4 multiple-choice answers
-    if all(mc_answers) and len(mc_answers) == 4:
-        debug("Using pre-computed analysis for multiple choice answers")
-        q1, q2, q3, q4 = mc_answers
-        pre_computed_analysis = get_analysis_for_combination(q1, q2, q3, q4)
-        
-        if pre_computed_analysis:
-            debug(f"Found pre-computed analysis for combination {q1}{q2}{q3}{q4}")
-            
-            # Normalize data structure to handle both nested and flattened formats
-            normalized_analysis = normalize_analysis_data(pre_computed_analysis)
-            
-            # Get the free response answer (if provided)
-            free_response = session.get("q5", "")
-            
-            # If free response is provided, customize the additional insights
-            if free_response and free_response.strip():
-                debug("Customizing additional insights based on free response")
-                
-                # If we have an API key, we can use OpenAI to customize the additional insights
-                if openai_api_key:
-                    try:
-                        prompt = f"""
-                        Based on the user's additional information: "{free_response}"
-                        
-                        Please provide a brief, personalized insight about their work preferences.
-                        Format as a JSON object with these fields:
-                        - description: A concise title/summary (max 10 words)
-                        - explanation: How their additional information informs their work preferences (1-2 sentences)
-                        
-                        Response format:
-                        {{
-                            "description": "brief description",
-                            "explanation": "brief explanation"
-                        }}
-                        """
-                        
-                        response = client.chat.completions.create(
-                            model="gpt-4o",
-                            messages=[{"role": "user", "content": prompt}],
-                            response_format={
-                                "type": "json_schema",
-                                "json_schema": {
-                                    "name": "additional_insights",
-                                    "strict": True,
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "description": {
-                                                "type": "string",
-                                                "description": "A concise title/summary (max 10 words)"
-                                            },
-                                            "explanation": {
-                                                "type": "string",
-                                                "description": "How additional information informs work preferences (1-2 sentences)"
-                                            }
-                                        },
-                                        "required": ["description", "explanation"],
-                                        "additionalProperties": False
-                                    }
-                                }
-                            }
-                        )
-                        
-                        custom_insights = json.loads(response.choices[0].message.content)
-                        normalized_analysis["additional_insights"] = custom_insights
-                    except Exception as e:
-                        # If there's an error, just use a generic additional insight
-                        app_logger.error(f"Error customizing additional insights: {str(e)}")
-                        normalized_analysis["additional_insights"] = {
-                            "description": "Additional information provided, but we couldn't customize the additional insights",
-                            "explanation": "You shared specific preferences that provide further context for your work environment needs."
-                        }
-                else:
-                    # Simple custom insight without API
-                    normalized_analysis["additional_insights"] = {
-                        "description": "Additional information provided, but we couldn't customize the additional insights",
-                        "explanation": "OPENAI API KEY NOT FOUND, UNABLE TO CUSTOMIZE ADDITIONAL INSIGHTS"
-                    }
-            else:
-                # If no free response, add default additional insights
-                normalized_analysis["additional_insights"] = {
-                    "description": "No additional information provided",
-                    "explanation": "You did not provide any additional context about your work preferences."
-                }
-            
-            return format_analysis(normalized_analysis)
+    debug("Using pre-computed analysis for multiple choice answers")
+    q1, q2, q3, q4 = mc_answers
+    pre_computed_analysis = get_analysis_for_combination(q1, q2, q3, q4)
     
-    # If we don't have pre-computed analysis (missing answers or combination not found),
-    # fall back to the original method
-    debug("No pre-computed analysis available, using standard analysis method")
-    
-    # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
-    prompt = "\n".join([
-        "Based on these assessment responses, provide a detailed analysis of the ideal",
-        "work environment for this candidate. For each aspect, explain how it specifically",
-        "relates to their assessment answers. Format the response in JSON with these fields:",
-        "- work_style: {",
-        "    description: brief description of preferred work style,",
-        "    explanation: how this connects to their assessment answers",
-        "  }",
-        "- environment: {",
-        "    description: ideal work environment,",
-        "    explanation: how this matches their preferences",
-        "  }",
-        "- interaction_level: {",
-        "    description: preferred level of social interaction,",
-        "    explanation: why this level suits them based on their responses",
-        "  }",
-        "- task_preference: {",
-        "    description: type of tasks they excel at,",
-        "    explanation: how this aligns with their answers",
-        "  }",
-        "- additional_insights: {",
-        "    description: insights from additional information provided,",
-        "    explanation: how this further informs their work preferences",
-        "  }",
-        "",
-        "Here are the responses:",
-        *answers
-    ])
-
-    try:
-        # If API key is not available, we'll still use our pre-computed analyses
-        # The code that calls analyze_responses should already have checked for pre-computed analyses
-        # This section only runs if we couldn't find a matching pre-computed analysis
+    if pre_computed_analysis:
+        debug(f"Found pre-computed analysis for combination {q1}{q2}{q3}{q4}")
         
-        if not openai_api_key:
-            debug("No API key available and no matching pre-computed analysis found")
-            # Return a message asking the user to provide an API key
-            return "To generate a personalized analysis, please provide an OpenAI API key or ensure your answers match our pre-computed templates."
+        # Normalize data structure to handle both nested and flattened formats
+        normalized_analysis = normalize_analysis_data(pre_computed_analysis)
         
-        debug("Calling OpenAI API for analysis")
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "work_analysis",
-                    "strict": True,
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "work_style": {
-                                "type": "object",
-                                "properties": {
-                                    "description": {"type": "string"},
-                                    "explanation": {"type": "string"}
-                                },
-                                "required": ["description", "explanation"],
-                                "additionalProperties": False
-                            },
-                            "environment": {
-                                "type": "object",
-                                "properties": {
-                                    "description": {"type": "string"},
-                                    "explanation": {"type": "string"}
-                                },
-                                "required": ["description", "explanation"],
-                                "additionalProperties": False
-                            },
-                            "interaction_level": {
-                                "type": "object",
-                                "properties": {
-                                    "description": {"type": "string"},
-                                    "explanation": {"type": "string"}
-                                },
-                                "required": ["description", "explanation"],
-                                "additionalProperties": False
-                            },
-                            "task_preference": {
-                                "type": "object",
-                                "properties": {
-                                    "description": {"type": "string"},
-                                    "explanation": {"type": "string"}
-                                },
-                                "required": ["description", "explanation"],
-                                "additionalProperties": False
-                            },
-                            "additional_insights": {
-                                "type": "object",
-                                "properties": {
-                                    "description": {"type": "string"},
-                                    "explanation": {"type": "string"}
-                                },
-                                "required": ["description", "explanation"],
-                                "additionalProperties": False
-                            }
-                        },
-                        "required": ["work_style", "environment", "interaction_level", "task_preference", "additional_insights"],
-                        "additionalProperties": False
-                    }
-                }
-            }
+        # Get the free response answer (if provided)
+        free_response = session.get("q5", "")
+        
+        # Initialize the CrewAI-based response evaluator
+        evaluator = ResponseEvaluator(
+            openai_client=client if openai_api_key else None,
+            debug_func=debug
         )
-
-        analysis = json.loads(response.choices[0].message.content)
-        debug("Analysis generated successfully")
         
-        # Normalize data from OpenAI to ensure consistent structure
-        normalized_analysis = normalize_analysis_data(analysis)
+        # Process the free response using the evaluator
+        normalized_analysis = evaluator.get_additional_insights(free_response, normalized_analysis)
+        
         return format_analysis(normalized_analysis)
-    except Exception as e:
-        app_logger.error(f"Error analyzing responses: {str(e)}")
-        debug(f"Analysis error: {str(e)}")
-        return "We encountered an error analyzing your responses. Please try again."
 
+# Format the analysis data into HTML
 def format_analysis(analysis):
     """Format the analysis data into HTML"""
-    return f"""
+    try:
+        # Make sure analysis is a valid dictionary
+        if not isinstance(analysis, dict):
+            app_logger.error(f"Invalid analysis format: {type(analysis)}")
+            analysis = {
+                'work_style': {'description': 'Not available', 'explanation': 'Analysis data was not properly structured.'},
+                'environment': {'description': 'Not available', 'explanation': 'Analysis data was not properly structured.'},
+                'interaction_level': {'description': 'Not available', 'explanation': 'Analysis data was not properly structured.'},
+                'task_preference': {'description': 'Not available', 'explanation': 'Analysis data was not properly structured.'},
+                'additional_insights': {'description': 'No additional insights', 'explanation': 'Analysis data was not properly structured.'}
+            }
+        
+        # Ensure all required sections exist
+        for section in ['work_style', 'environment', 'interaction_level', 'task_preference']:
+            if section not in analysis or not isinstance(analysis[section], dict):
+                analysis[section] = {'description': 'Not available', 'explanation': 'This section was missing from the analysis.'}
+        
+        # Ensure additional_insights exists
+        if 'additional_insights' not in analysis or not isinstance(analysis['additional_insights'], dict):
+            analysis['additional_insights'] = {'description': 'No additional insights', 'explanation': ''}
+            
+        # Format the HTML output
+        html_output = f"""
 <div class='analysis-section'>
     <h3>Work Style</h3>
-    <p class="mb-2"><strong>{analysis['work_style']['description']}</strong></p>
-    <p class="text-muted mb-4">{analysis['work_style']['explanation']}</p>
+    <p class="mb-2"><strong>{analysis['work_style'].get('description', 'Not available')}</strong></p>
+    <p class="text-muted mb-4">{analysis['work_style'].get('explanation', '')}</p>
 
     <h3>Ideal Environment</h3>
-    <p class="mb-2"><strong>{analysis['environment']['description']}</strong></p>
-    <p class="text-muted mb-4">{analysis['environment']['explanation']}</p>
+    <p class="mb-2"><strong>{analysis['environment'].get('description', 'Not available')}</strong></p>
+    <p class="text-muted mb-4">{analysis['environment'].get('explanation', '')}</p>
 
     <h3>Interaction Level</h3>
-    <p class="mb-2"><strong>{analysis['interaction_level']['description']}</strong></p>
-    <p class="text-muted mb-4">{analysis['interaction_level']['explanation']}</p>
+    <p class="mb-2"><strong>{analysis['interaction_level'].get('description', 'Not available')}</strong></p>
+    <p class="text-muted mb-4">{analysis['interaction_level'].get('explanation', '')}</p>
 
     <h3>Task Preferences</h3>
-    <p class="mb-2"><strong>{analysis['task_preference']['description']}</strong></p>
-    <p class="text-muted mb-4">{analysis['task_preference']['explanation']}</p>
+    <p class="mb-2"><strong>{analysis['task_preference'].get('description', 'Not available')}</strong></p>
+    <p class="text-muted mb-4">{analysis['task_preference'].get('explanation', '')}</p>
     
     <h3>Additional Insights</h3>
     <p class="mb-2"><strong>{analysis.get('additional_insights', {}).get('description', 'No additional insights')}</strong></p>
     <p class="text-muted mb-4">{analysis.get('additional_insights', {}).get('explanation', '')}</p>
 </div>
 """
+        debug(f"Successfully formatted analysis into HTML: {html_output[:50]}...")
+        return html_output
+        
+    except Exception as e:
+        app_logger.error(f"Error formatting analysis data: {str(e)}")
+        debug(f"Failed to format analysis: {str(e)}")
+        
+        # Return a minimal valid HTML in case of error
+        return """
+<div class='analysis-section'>
+    <h3>Analysis Error</h3>
+    <p class="mb-2"><strong>We encountered an error processing your responses</strong></p>
+    <p class="text-muted mb-4">Please try again or contact support if the issue persists.</p>
+</div>
+"""
 
+# DynamoDB data formatting
 def normalize_analysis_data(analysis_data):
     """
     Normalize analysis data to ensure consistent structure between DynamoDB and local data
@@ -573,6 +430,7 @@ def normalize_analysis_data(analysis_data):
     
     return normalized
 
+# Distinguish between pre-computed and Bedrock KB analyses
 def get_job_recommendations(analysis):
     """Get job recommendations based on user preferences"""
     debug("Generating job recommendations")
@@ -585,7 +443,8 @@ def get_job_recommendations(analysis):
     else:
         debug("Question 5 has content, using Bedrock for recommendations")
         return get_recommendations_from_bedrock(analysis)
-    
+
+# Get job recommendations from recommended_jobs in the analysis template
 def get_recommendations_from_dynamo():
     """Get job recommendations from recommended_jobs in the analysis template"""
     try:
@@ -664,26 +523,47 @@ def get_recommendations_from_dynamo():
         debug(f"Error retrieving recommendations from DynamoDB: {str(e)}")
         return get_fallback_recommendations()
 
+# Get job recommendations from Bedrock knowledge base
 def get_recommendations_from_bedrock(analysis):
     """Get job recommendations from Bedrock knowledge base"""
     try:
         # Extract key points from the analysis to form a query
         query = "Find job postings suitable for someone who:"
         
-        # Check if analysis is a string (error message) or formatted HTML
-        if isinstance(analysis, str) and not analysis.startswith("<div"):
-            debug("Analysis is error message or incomplete, using generic query")
+        # More robust check for valid HTML format
+        is_valid_html = False
+        if isinstance(analysis, str):
+            is_valid_html = analysis.strip().startswith("<div")
+        
+        if not is_valid_html:
+            debug("Analysis is not valid HTML, using generic query")
             query = "Find entry-level tech jobs suitable for neurodiverse candidates"
         else:
             # Extract key points from the analysis HTML
             debug("Extracting key points from analysis for query")
             
-            # Simple parsing to extract description text from the HTML
-            descriptions = re.findall(r'<strong>(.*?)</strong>', analysis)
-            if descriptions:
-                query += " " + " ".join(descriptions)
+            # Check for "not relevant" or similar in the additional insights
+            not_relevant_check = re.search(r'Additional information not relevant|not useful for job recommendations', analysis, re.IGNORECASE)
+            
+            if not_relevant_check:
+                debug("Found 'not relevant' in additional insights, using basic query plus MC answers")
+                
+                # Extract work style, environment, etc. from multiple choice answers
+                descriptions = re.findall(r'<strong>(.*?)</strong>', analysis)
+                relevant_descriptions = [d for d in descriptions if "not relevant" not in d.lower() and "not available" not in d.lower()]
+                
+                if relevant_descriptions:
+                    # Include only the descriptions from multiple choice questions (first 4)
+                    query += " " + " ".join(relevant_descriptions[:4]) if len(relevant_descriptions) > 4 else " ".join(relevant_descriptions)
+                else:
+                    query = "Find tech jobs suitable for neurodiverse candidates with various work preferences"
             else:
-                query = "Find tech jobs suitable for neurodiverse candidates with various work preferences"
+                # Simple parsing to extract description text from the HTML
+                descriptions = re.findall(r'<strong>(.*?)</strong>', analysis)
+                if descriptions:
+                    query += " " + " ".join(descriptions)
+                else:
+                    query = "Find tech jobs suitable for neurodiverse candidates with various work preferences"
         
         debug(f"Query for Bedrock: {query}")
         
@@ -729,153 +609,30 @@ def get_recommendations_from_bedrock(analysis):
                     # Last attempt failed, log and continue with empty results
                     app_logger.error(f"Error querying Bedrock after {max_retries} attempts: {error_msg}")
         
-        job_recommendations = []
+        if not retrieval_results:
+            debug("No results retrieved from Bedrock, using fallback recommendations")
+            return get_fallback_recommendations()
         
-        # Process each result
-        for i, result in enumerate(retrieval_results):
-            try:
-                # Extract S3 location information
-                s3_uri = result["location"]["s3Location"]["uri"]
-                score = int(float(result["score"]) * 100)  # Convert score to percentage
-                
-                debug(f"Processing result {i+1} with score {score}, URI: {s3_uri}")
-                
-                # Parse the S3 URI to get bucket and key
-                bucket, key = s3_uri.replace("s3://", "").split("/", 1)
-                
-                # Get the document from S3 with retry logic
-                max_s3_retries = 2
-                s3_retry_delay = 2  # seconds
-                content = None  # Initialize content variable
-                
-                for s3_attempt in range(max_s3_retries):
-                    try:
-                        debug(f"Retrieving S3 object {bucket}/{key} (attempt {s3_attempt+1}/{max_s3_retries})")
-                        obj = s3.get_object(Bucket=bucket, Key=key)
-                        content_bytes = obj["Body"].read()
-                        
-                        # Check if it's a PDF (starts with %PDF)
-                        if content_bytes.startswith(b'%PDF'):
-                            debug(f"Processing PDF document from {key}")
-                            # Parse PDF using PyPDF2
-                            pdf_reader = PyPDF2.PdfReader(io.BytesIO(content_bytes))
-                            content = ""
-                            for page in range(len(pdf_reader.pages)):
-                                content += pdf_reader.pages[page].extract_text() + "\n"
-                        else:
-                            # Assume it's plain text
-                            content = content_bytes.decode("utf-8", errors="ignore")
-                        
-                        debug(f"Content extracted, length: {len(content)} characters")
-                        break  # Success, exit retry loop
-                        
-                    except Exception as e:
-                        error_msg = str(e)
-                        debug(f"S3 retrieval error (attempt {s3_attempt+1}): {error_msg}")
-                        
-                        if s3_attempt < max_s3_retries - 1:
-                            # Still have retries left
-                            import time
-                            time.sleep(s3_retry_delay)
-                            continue
-                        else:
-                            # Last attempt failed, re-raise the exception to be caught by the outer try/except
-                            raise
-                
-                # If content retrieval failed, skip this job
-                if content is None:
-                    debug(f"Failed to retrieve content for {s3_uri}, skipping")
-                    continue
-                
-                # Extract job title from filename if possible (often contains good info)
-                filename_title = key.split('/')[-1]
-                if "-" in filename_title:
-                    # Format is often "ID-Job Title.pdf"
-                    parts = filename_title.split('-', 1)
-                    if len(parts) > 1:
-                        filename_title = parts[1].replace('.pdf', '').strip()
-                
-                # Default values
-                job_title = filename_title if filename_title else "Unknown Position"
-                company = "Unknown Company"
-                location = "Location Not Specified"
-                job_description = ""
-                
-                # Try to extract job title
-                title_match = None
-                for pattern in [
-                    r"Job\s+Requisition\s+Title:\s*(.*?)(?:\n|$)",
-                    r"Position\s+Title:\s*(.*?)(?:\n|$)",
-                    r"Title:\s*(.*?)(?:\n|$)",
-                ]:
-                    title_match = re.search(pattern, content, re.IGNORECASE)
-                    if title_match and title_match.group(1).strip():
-                        job_title = title_match.group(1).strip()
-                        break
-                
-                # Try to extract company
-                company_match = None
-                for pattern in [
-                    r"at\s+([\w\s]+(?:University|College|Corporation|Inc\.|LLC|Company))",
-                    r"Company:\s*(.*?)(?:\n|$)",
-                    r"Employer:\s*(.*?)(?:\n|$)",
-                    r"organization:\s*(.*?)(?:\n|$)"
-                ]:
-                    company_match = re.search(pattern, content, re.IGNORECASE)
-                    if company_match and company_match.group(1).strip():
-                        company = company_match.group(1).strip()
-                        break
-                
-                # Try to extract location
-                location_match = None
-                for pattern in [
-                    r"Location:\s*(.*?)(?:\n|$)",
-                    r"Place:\s*(.*?)(?:\n|$)",
-                    r"(?:Full Time or Part Time).*?(?:\n|$).*?(?:Date Posted).*?(?:\n|$).*?(?:Location|Place):\s*(.*?)(?:\n|$)"
-                ]:
-                    location_match = re.search(pattern, content, re.IGNORECASE)
-                    if location_match and location_match.group(1).strip():
-                        location = location_match.group(1).strip()
-                        break
-                
-                # Try to extract description
-                description_match = re.search(
-                    r"(?:External\s+Description|Description|Responsibilities|Duties|Overview)\s*(.*?)(?=\n\n|\n[A-Z]|$)",
-                    content, 
-                    re.IGNORECASE | re.DOTALL
-                )
-                if description_match:
-                    job_description = description_match.group(1).strip()
-                    if len(job_description) > 200:
-                        job_description = job_description[:197] + "..."
-                
-                # Generate reasoning based on the job description
-                reasoning = f"This position matches your preferences with a {score}% compatibility score."
-                if job_description:
-                    reasoning = f"{reasoning} The role involves {job_description}"
-                
-                # Create job recommendation object
-                job = {
-                    "title": job_title,
-                    "company": company,
-                    "location": location,
-                    "match_score": score,
-                    "reasoning": reasoning,
-                    "url": f"https://console.aws.amazon.com/s3/object/{bucket}/{key}"
-                }
-                
-                job_recommendations.append(job)
-                debug(f"Successfully processed job: {job_title}")
-                
-            except Exception as e:
-                app_logger.error(f"Error processing result {i}: {str(e)}")
-                debug(f"Result processing error: {str(e)}")
+        # Extract user profile from the analysis HTML for personalized job matching
+        user_profile = extract_user_profile_from_analysis(analysis)
+        debug(f"Extracted user profile for job matching: {user_profile}")
         
-        # If we couldn't retrieve any jobs, fall back to sample data
+        # Initialize the JobAnalyzer with the user's profile
+        job_analyzer = JobAnalyzer(
+            s3_client=s3,
+            debug_func=debug,
+            user_profile=user_profile
+        )
+        
+        # Process all retrieved job results with CrewAI agents
+        debug("Processing job results with CrewAI agents")
+        job_recommendations = job_analyzer.process_job_results(retrieval_results)
+        
         if not job_recommendations:
-            debug("No jobs retrieved from Bedrock, falling back to sample data")
+            debug("No valid job recommendations generated, using fallback")
             return get_fallback_recommendations()
             
+        debug(f"Successfully processed {len(job_recommendations)} job recommendations")
         return job_recommendations
         
     except Exception as e:
@@ -883,6 +640,46 @@ def get_recommendations_from_bedrock(analysis):
         debug(f"Bedrock recommendation error: {str(e)}")
         return get_fallback_recommendations()
 
+def extract_user_profile_from_analysis(analysis):
+    """Extract user profile information from the analysis HTML"""
+    try:
+        # Initialize default profile
+        profile = {
+            "work_style": "Not specified",
+            "environment": "Not specified",
+            "interaction_level": "Not specified",
+            "task_preference": "Not specified",
+            "additional_info": ""
+        }
+        
+        # Extract descriptions from analysis HTML using regex
+        descriptions = re.findall(r'<strong>(.*?)</strong>', analysis)
+        explanations = re.findall(r'<p class="text-muted mb-4">(.*?)</p>', analysis)
+        
+        # Map extracted information to profile sections
+        section_keys = ["work_style", "environment", "interaction_level", "task_preference", "additional_info"]
+        
+        for i, (key, desc) in enumerate(zip(section_keys, descriptions[:len(section_keys)])):
+            profile[key] = desc
+            
+            # Add explanation if available
+            if i < len(explanations):
+                profile[f"{key}_details"] = explanations[i]
+        
+        return profile
+        
+    except Exception as e:
+        debug(f"Error extracting user profile from analysis: {str(e)}")
+        # Return a basic profile if extraction fails
+        return {
+            "work_style": "Flexible",
+            "environment": "Adaptable",
+            "interaction_level": "Moderate",
+            "task_preference": "Varied",
+            "additional_info": ""
+        }
+
+# Return fallback job recommendations when other methods fail
 def get_fallback_recommendations():
     """Return fallback job recommendations when other methods fail"""
     debug("Using fallback job recommendations")

@@ -118,6 +118,7 @@ def load_templates(file_path='contents/analysis-bank.json'):
         return {}
 
 # Run when this script is executed directly
+# Run this script to update the DynamoDB table with the latest templates from analysis-bank.json
 if __name__ == "__main__":
     # Load templates from JSON file
     templates_dict = load_templates()
