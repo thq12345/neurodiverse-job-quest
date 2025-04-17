@@ -20,22 +20,43 @@
                     <h2 class="h4 mb-3">Recommended Job Matches</h2>
                     
                     {% for job in recommendations %}
-                    <div class="job-card mb-3 p-3 border rounded">
+                    <div class="job-card mb-4 p-4 border rounded shadow-sm">
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
                                 <h3 class="h5 mb-1">{{ job.title }}</h3>
-                                <p class="mb-1">{{ job.company }} - {{ job.location }}</p>
-                                <p class="text-muted small mb-2">{{ job.reasoning }}</p>
+                                <p class="mb-1">
+                                    <i class="bi bi-building me-1"></i>{{ job.company }} - 
+                                    <i class="bi bi-geo-alt me-1"></i>{{ job.location }}
+                                </p>
                             </div>
                             <div class="match-score">
-                                <span class="badge bg-{{ 'success' if job.match_score >= 80 else 'warning' if job.match_score >= 60 else 'secondary' }}">
+                                <span class="badge rounded-pill bg-{{ 'success' if job.match_score >= 80 else 'warning' if job.match_score >= 60 else 'secondary' }}">
                                     {{ job.match_score }}% Match
                                 </span>
                             </div>
                         </div>
-                        <div class="mt-2">
+                        
+                        <div class="mt-3">
+                            <p class="text-muted mb-2">{{ job.reasoning }}</p>
+                            
+                            {% if job.highlights and job.highlights|length > 0 %}
+                            <div class="highlights-section mt-2">
+                                <p class="mb-1 small text-secondary">Why this matches your profile:</p>
+                                <div class="d-flex flex-wrap">
+                                    {% for highlight in job.highlights %}
+                                    <span class="badge bg-light text-dark me-2 mb-1 p-2">
+                                        <i class="bi bi-check-circle-fill text-success me-1"></i>
+                                        {{ highlight }}
+                                    </span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mt-3">
                             <a href="{{ job.url }}" class="btn btn-outline-primary btn-sm" target="_blank">
-                                <i data-feather="external-link" class="feather-sm me-1"></i>View Job
+                                <i class="bi bi-box-arrow-up-right me-1"></i>View Full Job Posting
                             </a>
                         </div>
                     </div>
@@ -51,4 +72,23 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Fade in job cards one by one
+    document.addEventListener('DOMContentLoaded', function() {
+        const jobCards = document.querySelectorAll('.job-card');
+        jobCards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            
+            setTimeout(() => {
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, 100 * (index + 1));
+        });
+    });
+</script>
 {% endblock %}
