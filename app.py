@@ -5,8 +5,8 @@ load_dotenv()
 langtrace_api_key = os.environ.get("LANGTRACE_API_KEY")
 from langtrace_python_sdk import langtrace
 langtrace.init(api_key = langtrace_api_key)
-
-
+# Import pre-computed analyses
+from analysis_templates import get_analysis_for_combination
 from flask import Flask, render_template, request, session, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
@@ -14,9 +14,22 @@ from openai import OpenAI
 import logging
 import json
 import sys
+import boto3
+import re
+import io
+import PyPDF2
 
-# Import pre-computed analyses
-from analysis_templates import get_analysis_for_combination
+# Initialize AWS session
+aws_session = boto3.Session(
+    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+    region_name=os.getenv("AWS_REGION"),
+)
+
+# Create clients using the session
+bedrock = aws_session.client('bedrock-agent-runtime', region_name='us-east-1')
+knowledge_base_id = "7MVWRB84FD"
+s3 = aws_session.client('s3')
 
 # ===== Logging Configuration =====
 # Configure logging to show application messages but suppress framework noise
@@ -456,95 +469,185 @@ def format_analysis(analysis):
 
 def get_job_recommendations(analysis):
     """Get job recommendations based on user preferences"""
-    debug("Generating job recommendations")
+    debug("Generating job recommendations from AWS Bedrock")
     
     try:
-        # Since job scraping isn't working, provide sample jobs
-        sample_jobs = [
-            {
-                "title": "Data Quality Analyst",
-                "company": "Oracle",
-                "location": "Austin, TX (Remote Available)",
-                "match_score": 95,
-                "reasoning": "Perfect match for detail-oriented work style. Role offers structured environment with clear objectives and minimal interruptions.",
-                "url": "https://careers.oracle.com/jobs"
-            },
-            {
-                "title": "Software Developer - Backend",
-                "company": "Oracle Cloud Infrastructure",
-                "location": "Seattle, WA (Hybrid)",
-                "match_score": 92,
-                "reasoning": "Strong alignment with preference for focused technical work. Flexible schedule with dedicated quiet time for deep work.",
-                "url": "https://careers.oracle.com/jobs"
-            },
-            {
-                "title": "Quality Assurance Engineer",
-                "company": "Oracle",
-                "location": "Reston, VA",
-                "match_score": 88,
-                "reasoning": "Excellent fit for systematic thinking and attention to detail. Structured work environment with clear processes.",
-                "url": "https://careers.oracle.com/jobs"
-            },
-            {
-                "title": "Technical Documentation Specialist",
-                "company": "Oracle",
-                "location": "Remote",
-                "match_score": 85,
-                "reasoning": "Well-suited for detail-oriented work with minimal interruptions. Flexible remote work arrangement.",
-                "url": "https://careers.oracle.com/jobs"
-            },
-            {
-                "title": "Database Administrator",
-                "company": "Oracle",
-                "location": "Denver, CO",
-                "match_score": 82,
-                "reasoning": "Good match for structured, systematic work. Clear procedures and processes with predictable interactions.",
-                "url": "https://careers.oracle.com/jobs"
-            },
-            {
-                "title": "UI/UX Developer",
-                "company": "Oracle",
-                "location": "San Francisco, CA",
-                "match_score": 78,
-                "reasoning": "Moderate fit - offers creative work but may require more collaboration than preferred. Flexible work arrangements available.",
-                "url": "https://careers.oracle.com/jobs"
-            },
-            {
-                "title": "Systems Analyst",
-                "company": "Oracle",
-                "location": "Chicago, IL (Hybrid)",
-                "match_score": 75,
-                "reasoning": "Decent match for analytical skills, though requires regular team interaction. Structured project approach.",
-                "url": "https://careers.oracle.com/jobs"
-            },
-            {
-                "title": "Cloud Infrastructure Engineer",
-                "company": "Oracle",
-                "location": "Boston, MA",
-                "match_score": 72,
-                "reasoning": "Good technical fit but may involve more collaborative work than ideal. Clear technical focus with some team coordination.",
-                "url": "https://careers.oracle.com/jobs"
-            },
-            {
-                "title": "Product Support Engineer",
-                "company": "Oracle",
-                "location": "Remote",
-                "match_score": 68,
-                "reasoning": "Mixed fit - technical work aligns well but customer interaction may be challenging. Remote work offers flexibility.",
-                "url": "https://careers.oracle.com/jobs"
-            },
-            {
-                "title": "Agile Project Coordinator",
-                "company": "Oracle",
-                "location": "Miami, FL",
-                "match_score": 65,
-                "reasoning": "Lower match due to high social interaction requirements, but structured methodology provides clear framework.",
-                "url": "https://careers.oracle.com/jobs"
+        # Extract key points from the analysis to form a query
+        query = "Find job postings suitable for someone who:"
+        
+        # Check if analysis is a string (error message) or formatted HTML
+        if isinstance(analysis, str) and not analysis.startswith("<div"):
+            debug("Analysis is error message or incomplete, using generic query")
+            query = "Find entry-level tech jobs suitable for neurodiverse candidates"
+        else:
+            # Extract key points from the analysis HTML
+            debug("Extracting key points from analysis for query")
+            
+            # Simple parsing to extract description text from the HTML
+            descriptions = re.findall(r'<strong>(.*?)</strong>', analysis)
+            if descriptions:
+                query += " " + " ".join(descriptions)
+            else:
+                query = "Find tech jobs suitable for neurodiverse candidates with various work preferences"
+        
+        debug(f"Query for Bedrock: {query}")
+        
+        # Query the Bedrock knowledge base
+        response = bedrock.retrieve(
+            knowledgeBaseId=knowledge_base_id,
+            retrievalQuery={"text": query},
+            retrievalConfiguration={
+                "vectorSearchConfiguration": {
+                    "numberOfResults": 10  # Get top 10 results
+                }
             }
-        ]
-
-        debug(f"Generated {len(sample_jobs)} job recommendations")
-        return sample_jobs
+        )
+        
+        debug(f"Retrieved {len(response.get('retrievalResults', []))} results from Bedrock")
+        
+        job_recommendations = []
+        
+        # Process each result
+        for i, result in enumerate(response.get("retrievalResults", [])):
+            try:
+                # Extract S3 location information
+                s3_uri = result["location"]["s3Location"]["uri"]
+                score = int(float(result["score"]) * 100)  # Convert score to percentage
+                
+                debug(f"Processing result {i+1} with score {score}, URI: {s3_uri}")
+                
+                # Parse the S3 URI to get bucket and key
+                bucket, key = s3_uri.replace("s3://", "").split("/", 1)
+                
+                # Get the document from S3
+                try:
+                    obj = s3.get_object(Bucket=bucket, Key=key)
+                    content_bytes = obj["Body"].read()
+                    
+                    # Check if it's a PDF (starts with %PDF)
+                    if content_bytes.startswith(b'%PDF'):
+                        debug(f"Processing PDF document from {key}")
+                        # Parse PDF using PyPDF2
+                        pdf_reader = PyPDF2.PdfReader(io.BytesIO(content_bytes))
+                        content = ""
+                        for page in range(len(pdf_reader.pages)):
+                            content += pdf_reader.pages[page].extract_text() + "\n"
+                    else:
+                        # Assume it's plain text
+                        content = content_bytes.decode("utf-8", errors="ignore")
+                    
+                    debug(f"Content extracted, length: {len(content)} characters")
+                    
+                    # Extract job title from filename if possible (often contains good info)
+                    filename_title = key.split('/')[-1]
+                    if "-" in filename_title:
+                        # Format is often "ID-Job Title.pdf"
+                        parts = filename_title.split('-', 1)
+                        if len(parts) > 1:
+                            filename_title = parts[1].replace('.pdf', '').strip()
+                    
+                    # Default values
+                    job_title = filename_title if filename_title else "Unknown Position"
+                    company = "Unknown Company"
+                    location = "Location Not Specified"
+                    job_description = ""
+                    
+                    # Try to extract job title
+                    title_match = None
+                    for pattern in [
+                        r"Job\s+Requisition\s+Title:\s*(.*?)(?:\n|$)",
+                        r"Position\s+Title:\s*(.*?)(?:\n|$)",
+                        r"Title:\s*(.*?)(?:\n|$)",
+                    ]:
+                        title_match = re.search(pattern, content, re.IGNORECASE)
+                        if title_match and title_match.group(1).strip():
+                            job_title = title_match.group(1).strip()
+                            break
+                    
+                    # Try to extract company
+                    company_match = None
+                    for pattern in [
+                        r"at\s+([\w\s]+(?:University|College|Corporation|Inc\.|LLC|Company))",
+                        r"Company:\s*(.*?)(?:\n|$)",
+                        r"Employer:\s*(.*?)(?:\n|$)",
+                        r"organization:\s*(.*?)(?:\n|$)"
+                    ]:
+                        company_match = re.search(pattern, content, re.IGNORECASE)
+                        if company_match and company_match.group(1).strip():
+                            company = company_match.group(1).strip()
+                            break
+                    
+                    # Try to extract location
+                    location_match = None
+                    for pattern in [
+                        r"Location:\s*(.*?)(?:\n|$)",
+                        r"Place:\s*(.*?)(?:\n|$)",
+                        r"(?:Full Time or Part Time).*?(?:\n|$).*?(?:Date Posted).*?(?:\n|$).*?(?:Location|Place):\s*(.*?)(?:\n|$)"
+                    ]:
+                        location_match = re.search(pattern, content, re.IGNORECASE)
+                        if location_match and location_match.group(1).strip():
+                            location = location_match.group(1).strip()
+                            break
+                    
+                    # Try to extract description
+                    description_match = re.search(
+                        r"(?:External\s+Description|Description|Responsibilities|Duties|Overview)\s*(.*?)(?=\n\n|\n[A-Z]|$)",
+                        content, 
+                        re.IGNORECASE | re.DOTALL
+                    )
+                    if description_match:
+                        job_description = description_match.group(1).strip()
+                        if len(job_description) > 200:
+                            job_description = job_description[:197] + "..."
+                    
+                    # Generate reasoning based on the job description
+                    reasoning = f"This position matches your preferences with a {score}% compatibility score."
+                    if job_description:
+                        reasoning = f"{reasoning} The role involves {job_description}"
+                    
+                    # Create job recommendation object
+                    job = {
+                        "title": job_title,
+                        "company": company,
+                        "location": location,
+                        "match_score": score,
+                        "reasoning": reasoning,
+                        "url": f"https://console.aws.amazon.com/s3/object/{bucket}/{key}"
+                    }
+                    
+                    job_recommendations.append(job)
+                    debug(f"Successfully processed job: {job_title}")
+                    
+                except Exception as e:
+                    app_logger.error(f"Error processing S3 object {s3_uri}: {str(e)}")
+                    debug(f"S3 retrieval error for {s3_uri}: {str(e)}")
+            
+            except Exception as e:
+                app_logger.error(f"Error processing result {i}: {str(e)}")
+                debug(f"Result processing error: {str(e)}")
+        
+        # If we couldn't retrieve any jobs, fall back to sample data
+        if not job_recommendations:
+            debug("No jobs retrieved from Bedrock, falling back to sample data")
+            job_recommendations = [
+                {
+                    "title": "CANT FIND A JOB",
+                    "company": "PLACEHOLDER",
+                    "location": "PLACEHOLDER",
+                    "match_score": 0,
+                    "reasoning": "PLACEHOLDER",
+                    "url": "https://careers.oracle.com/jobs"
+                }
+            ]
+        
+        # Sort by match score
+        job_recommendations.sort(key=lambda x: x["match_score"], reverse=True)
+        
+        # Limit to top 10
+        job_recommendations = job_recommendations[:10]
+        
+        debug(f"Returning {len(job_recommendations)} job recommendations")
+        return job_recommendations
 
     except Exception as e:
         app_logger.error(f"Error generating job recommendations: {str(e)}")
