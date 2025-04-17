@@ -1,0 +1,282 @@
+[
+    {
+      "job_id": 1,
+      "title": "Assistant Director of Development",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (Hybrid)",
+      "match_score": 87,
+      "reasoning": "This fundraising‑focused role centers on major gift solicitation, alumni engagement, and donor relations—areas that do not align with your data engineering and pipeline development expertise.",
+      "url": "https://www.vanderbilt.edu/dar/"
+    },
+    {
+      "job_id": 2,
+      "title": "Research Assistant, Chemical and Biomolecular Engineering",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 93,
+      "reasoning": "This lab‑based position involves animal protocols, molecular biology techniques, and in vivo experiments—none of which overlap with your data engineering and software development skill set.",
+      "url": "http://www.immunoengineeringlab.org"
+    },
+    {
+      "job_id": 3,
+      "title": "Assistant Vice Chancellor for Crisis, Reputation and Issues Management",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 82,
+      "reasoning": "This senior communications role focuses on crisis planning, media strategy, and stakeholder messaging—areas distinct from data engineering and analytics.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 4,
+      "title": "Research Assistant, Senior (Warren Center, Plumley Lab)",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 91,
+      "reasoning": "This pharmacology research role requires high‑throughput screening, cell culture, and assay development—science and lab work that do not leverage your data engineering background.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 5,
+      "title": "Assistant Director of Campus Services",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 85,
+      "reasoning": "This facilities management position covers custodial and grounds operations, fleet oversight, and process improvement—areas outside the realm of software and data engineering.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 6,
+      "title": "Assistant Director, Student Center for Social Justice and Identity",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 89,
+      "reasoning": "This student affairs leadership role emphasizes multicultural programming, training design, and community advising rather than data systems or engineering.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 7,
+      "title": "Research Assistant",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 96,
+      "reasoning": "This psychology lab role involves behavioral experiment setup, animal care, and Matlab kiosk systems; while it uses some programming, it is not centered on data engineering or large‑scale ETL processes.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 8,
+      "title": "Assistant To The Dean",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 81,
+      "reasoning": "This executive administrative support role focuses on calendar management, travel arrangements, and correspondence rather than technical or engineering responsibilities.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 9,
+      "title": "Assistant Director of Research Finance - Grants Management",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 88,
+      "reasoning": "This grants management role emphasizes financial reconciliation, Oracle ERP expertise, and post‑award reporting—analytical but not aligned with your data engineering focus.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 10,
+      "title": "Assistant Dean for Career Services, Law School",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 90,
+      "reasoning": "This career services leadership role centers on student placement, employer relations, and programming in a legal context—distinct from data engineering responsibilities.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 11,
+      "title": "Assistant Director, Radiation and Laser Safety and University Radiation Safety Officer",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 84,
+      "reasoning": "This safety leadership role requires deep expertise in radiation and laser compliance, regulatory inspections, and emergency response—areas far outside data engineering and ETL pipelines.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 12,
+      "title": "Executive Assistant",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (Hybrid)",
+      "match_score": 83,
+      "reasoning": "This high‑level administrative support role focuses on calendar management, confidential communications, and event coordination rather than technical data engineering.",
+      "url": "https://www.vanderbilt.edu/dar/"
+    },
+    {
+      "job_id": 13,
+      "title": "Research Assistant, Pharmacology (Nguyen Lab)",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 95,
+      "reasoning": "This lab position involves electrophysiology, imaging, and in vivo experiments—scientific research tasks that do not leverage your data engineering skills.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 14,
+      "title": "Accounting Assistant",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 80,
+      "reasoning": "This role centers on purchase requisitions, invoice processing, and reconciliations in Oracle—important financial tasks but not data pipeline or engineering work.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 15,
+      "title": "Research Assistant, Pharmacology",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 94,
+      "reasoning": "This research role focuses on rodent colony maintenance, stereotaxic surgery, and electrophysiology—biological lab work unrelated to software or data engineering pipelines.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 16,
+      "title": "Assistant Teacher",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 86,
+      "reasoning": "This campus support role likely involves classroom assistance and program delivery, without technical or data engineering responsibilities.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 17,
+      "title": "Assistant Dean of Development - SON",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (Hybrid)",
+      "match_score": 92,
+      "reasoning": "This senior fundraising position manages major gift strategies and donor relations for the School of Nursing—important leadership work but not aligned with data engineering.",
+      "url": "https://www.vanderbilt.edu/dar/"
+    },
+    {
+      "job_id": 18,
+      "title": "Real Estate Accounting Assistant",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 87,
+      "reasoning": "This role focuses on lease accounting, invoice review, and revenue reconciliations—financial operations tasks rather than data engineering or pipeline development.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 19,
+      "title": "Research Assistant, Pharmacology",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 97,
+      "reasoning": "This lab position involves zebrafish colony work, molecular assays, and behavioral studies—specialized biological research with no direct data engineering application.",
+      "url": "https://www.cigliola-lab.com"
+    },
+    {
+      "job_id": 20,
+      "title": "Assistant Director, Development and Alumni Engagement - Athletics",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 89,
+      "reasoning": "This development role focuses on securing athletic donations and alumni engagement—fundraising and event planning rather than technical data work.",
+      "url": "https://www.vanderbilt.edu/dar/"
+    },
+    {
+      "job_id": 21,
+      "title": "Research Assistant, Biochemistry (Hodges Lab)",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 93,
+      "reasoning": "This wet‑lab position centers on epigenomics research, DNA sequencing workflows, and molecular biology techniques, which do not align with your data engineering expertise.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 22,
+      "title": "Research Assistant, Pharmacology",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 91,
+      "reasoning": "This role involves routine lab maintenance, equipment support, and animal protocols—tasks outside of large‑scale data processing or pipeline development.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 23,
+      "title": "DAR Assistant, Law School",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (Hybrid)",
+      "match_score": 84,
+      "reasoning": "This administrative role supports fundraising officers with project management and database updates rather than building or maintaining data pipelines.",
+      "url": "https://www.vanderbilt.edu/dar/"
+    },
+    {
+      "job_id": 24,
+      "title": "Library Assistant for Resource Sharing",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 85,
+      "reasoning": "This position focuses on interlibrary loan operations and student supervision, not on software engineering or data architecture.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 25,
+      "title": "Cook Assistant",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 80,
+      "reasoning": "This culinary support role involves food prep and kitchen operations rather than technical or engineering responsibilities.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 26,
+      "title": "Research Assistant, Molecular Physiology and Biophysics (Chen Lab)",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 96,
+      "reasoning": "This lab role requires cell line engineering, lentiviral work, and molecular assays, which do not leverage your data engineering skill set.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 27,
+      "title": "Assistant Dean of Development - Divinity School",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (Hybrid)",
+      "match_score": 88,
+      "reasoning": "This senior fundraising position focuses on major gift strategy and donor relations for the Divinity School, not on data infrastructure or analytics development.",
+      "url": "https://www.vanderbilt.edu/dar/"
+    },
+    {
+      "job_id": 28,
+      "title": "Offense Assistant Coach, Football",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 82,
+      "reasoning": "This coaching role centers on film study, play analysis, and athlete instruction rather than data engineering or ETL processes.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 29,
+      "title": "Assistant Dean for Admissions, Law School",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 90,
+      "reasoning": "This executive admissions role involves recruitment strategy and application review, not the design or maintenance of data pipelines.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 30,
+      "title": "Research Assistant, Molecular Physiology and Biophysics (Mchaourab Lab)",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 94,
+      "reasoning": "This position focuses on protein biochemistry, cryo‑EM, and EPR spectroscopy—laboratory methods outside the scope of data engineering.",
+      "url": "https://www.vanderbilt.edu"
+    },
+    {
+      "job_id": 31,
+      "title": "Administrative Assistant, Senior",
+      "company": "Vanderbilt University",
+      "location": "Nashville, TN (On‑site)",
+      "match_score": 86,
+      "reasoning": "This administrative role provides programmatic and front‑desk support for Immersion Vanderbilt, focusing on event coordination, workshop hosting, and student/faculty liaison duties rather than on software development or data engineering pipelines.",
+      "url": "https://www.vanderbilt.edu"
+    }
+  ]
+  

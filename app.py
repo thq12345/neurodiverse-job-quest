@@ -114,8 +114,9 @@ questions = [
     },
     {
         "id": 5,
-        "text": "Is there anything else we should know about you?",
-        "type": "free_response"
+        "text": "Is there anything else we should know about you? (Optional)",
+        "type": "free_response",
+        "optional": True
     }
 ]
 
@@ -134,15 +135,24 @@ def submit_questionnaire():
     debug("Questionnaire submitted")
     debug("Form data", request.form)
     
-    # Verify all questions are answered
-    if not all(f"q{i+1}" in request.form for i in range(len(questions))):
+    # Verify required questions are answered (now excluding q5 which is optional)
+    required_questions = [f"q{i+1}" for i in range(len(questions)) 
+                          if not (i+1 == 5 and 'optional' in questions[i] and questions[i]['optional'])]
+    
+    if not all(q in request.form for q in required_questions):
         debug("Missing required answers")
         return redirect(url_for("questionnaire"))
     
     # Store answers in session
     for i in range(len(questions)):
         question_key = f"q{i+1}"
-        session[question_key] = request.form.get(question_key)
+        
+        # Handle case when optional question is not answered
+        if i+1 == 5 and 'optional' in questions[i] and questions[i]['optional'] and question_key not in request.form:
+            session[question_key] = ""
+            continue
+            
+        session[question_key] = request.form.get(question_key, "")
         
         # Log the answer
         question_text = questions[i]["text"]
@@ -255,8 +265,8 @@ def analyze_responses(answers):
         if pre_computed_analysis:
             debug(f"Found pre-computed analysis for combination {q1}{q2}{q3}{q4}")
             
-            # Normalize data structure
-            pre_computed_analysis = normalize_analysis_data(pre_computed_analysis)
+            # Normalize data structure to handle both nested and flattened formats
+            normalized_analysis = normalize_analysis_data(pre_computed_analysis)
             
             # Get the free response answer (if provided)
             free_response = session.get("q5", "")
@@ -311,28 +321,28 @@ def analyze_responses(answers):
                         )
                         
                         custom_insights = json.loads(response.choices[0].message.content)
-                        pre_computed_analysis["additional_insights"] = custom_insights
+                        normalized_analysis["additional_insights"] = custom_insights
                     except Exception as e:
                         # If there's an error, just use a generic additional insight
                         app_logger.error(f"Error customizing additional insights: {str(e)}")
-                        pre_computed_analysis["additional_insights"] = {
+                        normalized_analysis["additional_insights"] = {
                             "description": "Additional information provided, but we couldn't customize the additional insights",
                             "explanation": "You shared specific preferences that provide further context for your work environment needs."
                         }
                 else:
                     # Simple custom insight without API
-                    pre_computed_analysis["additional_insights"] = {
+                    normalized_analysis["additional_insights"] = {
                         "description": "Additional information provided, but we couldn't customize the additional insights",
                         "explanation": "OPENAI API KEY NOT FOUND, UNABLE TO CUSTOMIZE ADDITIONAL INSIGHTS"
                     }
             else:
                 # If no free response, add default additional insights
-                pre_computed_analysis["additional_insights"] = {
-                    "description": "No additional information provided, and we couldn't customize the additional insights",
+                normalized_analysis["additional_insights"] = {
+                    "description": "No additional information provided",
                     "explanation": "You did not provide any additional context about your work preferences."
                 }
             
-            return format_analysis(pre_computed_analysis)
+            return format_analysis(normalized_analysis)
     
     # If we don't have pre-computed analysis (missing answers or combination not found),
     # fall back to the original method
@@ -518,7 +528,18 @@ def normalize_analysis_data(analysis_data):
         }
     }
     
-    # Copy data from the source to our normalized structure
+    # Handle the flattened structure from DynamoDB
+    # Check for flattened field pairs (e.g., work_style_description and work_style_explanation)
+    for section in ['work_style', 'environment', 'interaction_level', 'task_preference']:
+        desc_key = f"{section}_description"
+        exp_key = f"{section}_explanation"
+        
+        if desc_key in analysis_data:
+            normalized[section]['description'] = analysis_data[desc_key]
+        if exp_key in analysis_data:
+            normalized[section]['explanation'] = analysis_data[exp_key]
+    
+    # Also handle the nested structure (for backward compatibility)
     for section in ['work_style', 'environment', 'interaction_level', 'task_preference']:
         if section in analysis_data:
             if isinstance(analysis_data[section], dict):
@@ -554,8 +575,97 @@ def normalize_analysis_data(analysis_data):
 
 def get_job_recommendations(analysis):
     """Get job recommendations based on user preferences"""
-    debug("Generating job recommendations from AWS Bedrock")
+    debug("Generating job recommendations")
     
+    # Check if q5 (free response) is empty - if it is, use recommended_jobs from DynamoDB
+    q5_response = session.get('q5', '')
+    if not q5_response:
+        debug("Question 5 is empty, using recommended_jobs from analysis template")
+        return get_recommendations_from_dynamo()
+    else:
+        debug("Question 5 has content, using Bedrock for recommendations")
+        return get_recommendations_from_bedrock(analysis)
+    
+def get_recommendations_from_dynamo():
+    """Get job recommendations from recommended_jobs in the analysis template"""
+    try:
+        # Get the template ID based on the user's answers to questions 1-4
+        template_id = (
+            session.get('q1', 'A') + 
+            session.get('q2', 'A') + 
+            session.get('q3', 'A') + 
+            session.get('q4', 'A')
+        )
+        
+        debug(f"Looking up template with ID: {template_id}")
+        
+        # Initialize the AnalysisTemplates table
+        analysis_table = dynamodb.Table('AnalysisTemplates')
+        
+        # Get the template with recommended_jobs
+        response = analysis_table.get_item(Key={'template_id': template_id})
+        if 'Item' not in response:
+            debug(f"Template {template_id} not found, using fallback")
+            return get_fallback_recommendations()
+        
+        template = response['Item']
+        debug(f"Template found: {template}")
+        
+        # Check if recommended_jobs exists and parse it from JSON if needed
+        if 'recommended_jobs' in template:
+            # If recommended_jobs is a string (JSON), parse it
+            recommended_jobs = template['recommended_jobs']
+            if isinstance(recommended_jobs, str):
+                try:
+                    recommended_jobs = json.loads(recommended_jobs)
+                    debug(f"Parsed recommended_jobs from JSON: {recommended_jobs}")
+                except:
+                    debug("Failed to parse recommended_jobs from JSON")
+            matching_job_ids = recommended_jobs
+        else:
+            # For backward compatibility, check for matching_jobs
+            matching_job_ids = template.get('matching_jobs', [])
+        
+        debug(f"Found job IDs: {matching_job_ids}")
+        
+        if not matching_job_ids:
+            debug("No job IDs found, using fallback")
+            return get_fallback_recommendations()
+        
+        # Initialize the JobBank table
+        job_table = dynamodb.Table('JobBank')
+        
+        # Retrieve each matching job
+        job_recommendations = []
+        for job_id in matching_job_ids:
+            try:
+                # Convert to integer if it's a string
+                if isinstance(job_id, str) and job_id.isdigit():
+                    job_id = int(job_id)
+                
+                debug(f"Looking up job with ID: {job_id}")
+                job_response = job_table.get_item(Key={'job_id': job_id})
+                if 'Item' in job_response:
+                    job_recommendations.append(job_response['Item'])
+                else:
+                    debug(f"Job ID {job_id} not found in JobBank")
+            except Exception as e:
+                debug(f"Error retrieving job ID {job_id}: {str(e)}")
+        
+        debug(f"Retrieved {len(job_recommendations)} jobs from JobBank")
+        
+        if not job_recommendations:
+            debug("Failed to retrieve any matching jobs, using fallback")
+            return get_fallback_recommendations()
+        
+        return job_recommendations
+        
+    except Exception as e:
+        debug(f"Error retrieving recommendations from DynamoDB: {str(e)}")
+        return get_fallback_recommendations()
+
+def get_recommendations_from_bedrock(analysis):
+    """Get job recommendations from Bedrock knowledge base"""
     try:
         # Extract key points from the analysis to form a query
         query = "Find job postings suitable for someone who:"
@@ -764,73 +874,44 @@ def get_job_recommendations(analysis):
         # If we couldn't retrieve any jobs, fall back to sample data
         if not job_recommendations:
             debug("No jobs retrieved from Bedrock, falling back to sample data")
-            job_recommendations = [
-                {
-                    "title": "CANT FIND A JOB",
-                    "company": "PLACEHOLDER",
-                    "location": "PLACEHOLDER",
-                    "match_score": 0,
-                    "reasoning": "PLACEHOLDER",
-                    "url": "https://careers.oracle.com/jobs"
-                }
-            ]
+            return get_fallback_recommendations()
             
-            job_recommendations = [
-                {
-                    "title": "Data Quality Analyst",
-                    "company": "Oracle",
-                    "location": "Austin, TX (Remote Available)",
-                    "match_score": 95,
-                    "reasoning": "Fallback job match for neurodiverse candidates. This role offers a structured environment with clear objectives and minimal interruptions.",
-                    "url": "https://careers.oracle.com/jobs"
-                },
-                {
-                    "title": "Software Developer - Backend",
-                    "company": "Oracle Cloud Infrastructure", 
-                    "location": "Seattle, WA (Hybrid)",
-                    "match_score": 92,
-                    "reasoning": "Fallback job match for neurodiverse candidates. This role features flexible scheduling with dedicated quiet time for deep work.",
-                    "url": "https://careers.oracle.com/jobs"
-                },
-                {
-                    "title": "Quality Assurance Engineer",
-                    "company": "Oracle",
-                    "location": "Reston, VA",
-                    "match_score": 88,
-                    "reasoning": "Fallback job match for neurodiverse candidates. This role provides structured work environment with clear processes.",
-                    "url": "https://careers.oracle.com/jobs"
-                },
-                {
-                    "title": "Technical Documentation Specialist",
-                    "company": "Oracle",
-                    "location": "Remote",
-                    "match_score": 85,
-                    "reasoning": "Fallback job match for neurodiverse candidates. This role offers flexible remote work with minimal interruptions.",
-                    "url": "https://careers.oracle.com/jobs"
-                },
-                {
-                    "title": "Database Administrator",
-                    "company": "Oracle",
-                    "location": "Denver, CO",
-                    "match_score": 82, 
-                    "reasoning": "Fallback job match for neurodiverse candidates. This role features clear procedures and predictable interactions.",
-                    "url": "https://careers.oracle.com/jobs"
-                }
-            ]
-        
-        # Sort by match score
-        job_recommendations.sort(key=lambda x: x["match_score"], reverse=True)
-        
-        # Limit to top 10
-        job_recommendations = job_recommendations[:10]
-        
-        debug(f"Returning {len(job_recommendations)} job recommendations")
         return job_recommendations
-
+        
     except Exception as e:
-        app_logger.error(f"Error generating job recommendations: {str(e)}")
-        debug(f"Job recommendation error: {str(e)}")
-        return []
+        app_logger.error(f"Error in get_recommendations_from_bedrock: {str(e)}")
+        debug(f"Bedrock recommendation error: {str(e)}")
+        return get_fallback_recommendations()
+
+def get_fallback_recommendations():
+    """Return fallback job recommendations when other methods fail"""
+    debug("Using fallback job recommendations")
+    return [
+        {
+            "title": "Data Quality Analyst",
+            "company": "Oracle",
+            "location": "Austin, TX (Remote Available)",
+            "match_score": 95,
+            "reasoning": "Fallback job match for neurodiverse candidates. This role offers a structured environment with clear objectives and minimal interruptions.",
+            "url": "https://careers.oracle.com/jobs"
+        },
+        {
+            "title": "Software Developer - Backend",
+            "company": "Oracle Cloud Infrastructure", 
+            "location": "Seattle, WA (Hybrid)",
+            "match_score": 92,
+            "reasoning": "Fallback job match for neurodiverse candidates. This role features flexible scheduling with dedicated quiet time for deep work.",
+            "url": "https://careers.oracle.com/jobs"
+        },
+        {
+            "title": "Quality Assurance Engineer",
+            "company": "Oracle",
+            "location": "Reston, VA",
+            "match_score": 88,
+            "reasoning": "Fallback job match for neurodiverse candidates. This role provides structured work environment with clear processes.",
+            "url": "https://careers.oracle.com/jobs"
+        }
+    ]
 
 with app.app_context():
     db.create_all()
