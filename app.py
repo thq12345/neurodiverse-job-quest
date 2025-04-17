@@ -28,8 +28,9 @@ aws_session = boto3.Session(
 
 # Create clients using the session
 bedrock = aws_session.client('bedrock-agent-runtime', region_name='us-east-1')
-knowledge_base_id = "7MVWRB84FD"
+knowledge_base_id = "ILPMNFRVOC"
 s3 = aws_session.client('s3')
+dynamodb = aws_session.resource('dynamodb')
 
 # ===== Logging Configuration =====
 # Configure logging to show application messages but suppress framework noise
@@ -254,6 +255,9 @@ def analyze_responses(answers):
         if pre_computed_analysis:
             debug(f"Found pre-computed analysis for combination {q1}{q2}{q3}{q4}")
             
+            # Normalize data structure
+            pre_computed_analysis = normalize_analysis_data(pre_computed_analysis)
+            
             # Get the free response answer (if provided)
             free_response = session.get("q5", "")
             
@@ -312,15 +316,21 @@ def analyze_responses(answers):
                         # If there's an error, just use a generic additional insight
                         app_logger.error(f"Error customizing additional insights: {str(e)}")
                         pre_computed_analysis["additional_insights"] = {
-                            "description": "Additional information provided",
+                            "description": "Additional information provided, but we couldn't customize the additional insights",
                             "explanation": "You shared specific preferences that provide further context for your work environment needs."
                         }
                 else:
                     # Simple custom insight without API
                     pre_computed_analysis["additional_insights"] = {
-                        "description": "Additional information provided",
+                        "description": "Additional information provided, but we couldn't customize the additional insights",
                         "explanation": "OPENAI API KEY NOT FOUND, UNABLE TO CUSTOMIZE ADDITIONAL INSIGHTS"
                     }
+            else:
+                # If no free response, add default additional insights
+                pre_computed_analysis["additional_insights"] = {
+                    "description": "No additional information provided, and we couldn't customize the additional insights",
+                    "explanation": "You did not provide any additional context about your work preferences."
+                }
             
             return format_analysis(pre_computed_analysis)
     
@@ -435,7 +445,10 @@ def analyze_responses(answers):
 
         analysis = json.loads(response.choices[0].message.content)
         debug("Analysis generated successfully")
-        return format_analysis(analysis)
+        
+        # Normalize data from OpenAI to ensure consistent structure
+        normalized_analysis = normalize_analysis_data(analysis)
+        return format_analysis(normalized_analysis)
     except Exception as e:
         app_logger.error(f"Error analyzing responses: {str(e)}")
         debug(f"Analysis error: {str(e)}")
@@ -467,6 +480,78 @@ def format_analysis(analysis):
 </div>
 """
 
+def normalize_analysis_data(analysis_data):
+    """
+    Normalize analysis data to ensure consistent structure between DynamoDB and local data
+    
+    Args:
+        analysis_data: The analysis data from either local or DynamoDB source
+        
+    Returns:
+        A normalized analysis data structure
+    """
+    # If this is None, return early
+    if not analysis_data:
+        return None
+        
+    # Initialize with default structure
+    normalized = {
+        'work_style': {
+            'description': '',
+            'explanation': ''
+        },
+        'environment': {
+            'description': '',
+            'explanation': ''
+        },
+        'interaction_level': {
+            'description': '',
+            'explanation': ''
+        },
+        'task_preference': {
+            'description': '',
+            'explanation': ''
+        },
+        'additional_insights': {
+            'description': 'No additional insights',
+            'explanation': ''
+        }
+    }
+    
+    # Copy data from the source to our normalized structure
+    for section in ['work_style', 'environment', 'interaction_level', 'task_preference']:
+        if section in analysis_data:
+            if isinstance(analysis_data[section], dict):
+                # Handle nested dict structure (local format)
+                if 'description' in analysis_data[section]:
+                    normalized[section]['description'] = analysis_data[section]['description']
+                if 'explanation' in analysis_data[section]:
+                    normalized[section]['explanation'] = analysis_data[section]['explanation']
+            elif isinstance(analysis_data[section], str):
+                # Handle DynamoDB's potential string conversion
+                try:
+                    section_data = json.loads(analysis_data[section])
+                    normalized[section]['description'] = section_data.get('description', '')
+                    normalized[section]['explanation'] = section_data.get('explanation', '')
+                except (json.JSONDecodeError, TypeError):
+                    # If it's not valid JSON, use as is
+                    normalized[section]['description'] = analysis_data[section]
+    
+    # Handle additional insights separately as it might be added later
+    if 'additional_insights' in analysis_data:
+        if isinstance(analysis_data['additional_insights'], dict):
+            normalized['additional_insights']['description'] = analysis_data['additional_insights'].get('description', 'No additional insights')
+            normalized['additional_insights']['explanation'] = analysis_data['additional_insights'].get('explanation', '')
+        elif isinstance(analysis_data['additional_insights'], str):
+            try:
+                insights_data = json.loads(analysis_data['additional_insights'])
+                normalized['additional_insights']['description'] = insights_data.get('description', 'No additional insights')
+                normalized['additional_insights']['explanation'] = insights_data.get('explanation', '')
+            except (json.JSONDecodeError, TypeError):
+                normalized['additional_insights']['description'] = analysis_data['additional_insights']
+    
+    return normalized
+
 def get_job_recommendations(analysis):
     """Get job recommendations based on user preferences"""
     debug("Generating job recommendations from AWS Bedrock")
@@ -492,23 +577,52 @@ def get_job_recommendations(analysis):
         
         debug(f"Query for Bedrock: {query}")
         
-        # Query the Bedrock knowledge base
-        response = bedrock.retrieve(
-            knowledgeBaseId=knowledge_base_id,
-            retrievalQuery={"text": query},
-            retrievalConfiguration={
-                "vectorSearchConfiguration": {
-                    "numberOfResults": 10  # Get top 10 results
-                }
-            }
-        )
+        # Query the Bedrock knowledge base with retry logic for auto-pause situations
+        retrieval_results = []
+        max_retries = 3
+        retry_delay = 5  # seconds
         
-        debug(f"Retrieved {len(response.get('retrievalResults', []))} results from Bedrock")
+        for attempt in range(max_retries):
+            try:
+                debug(f"Querying Bedrock knowledge base (attempt {attempt+1}/{max_retries})")
+                response = bedrock.retrieve(
+                    knowledgeBaseId=knowledge_base_id,
+                    retrievalQuery={"text": query},
+                    retrievalConfiguration={
+                        "vectorSearchConfiguration": {
+                            "numberOfResults": 10  # Get top 10 results
+                        }
+                    }
+                )
+                
+                retrieval_results = response.get('retrievalResults', [])
+                debug(f"Retrieved {len(retrieval_results)} results from Bedrock")
+                break  # Successful, exit the retry loop
+                
+            except Exception as e:
+                error_msg = str(e)
+                debug(f"Bedrock query error (attempt {attempt+1}): {error_msg}")
+                
+                # Check if this is the auto-pause resumption error
+                if "resuming after being auto-paused" in error_msg and attempt < max_retries - 1:
+                    import time
+                    wait_time = retry_delay * (attempt + 1)  # Exponential backoff
+                    debug(f"Vector database is resuming after auto-pause. Waiting {wait_time} seconds before retry...")
+                    time.sleep(wait_time)
+                    continue  # Try again
+                elif attempt < max_retries - 1:
+                    # Other error but still have retries left
+                    import time
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    # Last attempt failed, log and continue with empty results
+                    app_logger.error(f"Error querying Bedrock after {max_retries} attempts: {error_msg}")
         
         job_recommendations = []
         
         # Process each result
-        for i, result in enumerate(response.get("retrievalResults", [])):
+        for i, result in enumerate(retrieval_results):
             try:
                 # Extract S3 location information
                 s3_uri = result["location"]["s3Location"]["uri"]
@@ -519,109 +633,130 @@ def get_job_recommendations(analysis):
                 # Parse the S3 URI to get bucket and key
                 bucket, key = s3_uri.replace("s3://", "").split("/", 1)
                 
-                # Get the document from S3
-                try:
-                    obj = s3.get_object(Bucket=bucket, Key=key)
-                    content_bytes = obj["Body"].read()
-                    
-                    # Check if it's a PDF (starts with %PDF)
-                    if content_bytes.startswith(b'%PDF'):
-                        debug(f"Processing PDF document from {key}")
-                        # Parse PDF using PyPDF2
-                        pdf_reader = PyPDF2.PdfReader(io.BytesIO(content_bytes))
-                        content = ""
-                        for page in range(len(pdf_reader.pages)):
-                            content += pdf_reader.pages[page].extract_text() + "\n"
-                    else:
-                        # Assume it's plain text
-                        content = content_bytes.decode("utf-8", errors="ignore")
-                    
-                    debug(f"Content extracted, length: {len(content)} characters")
-                    
-                    # Extract job title from filename if possible (often contains good info)
-                    filename_title = key.split('/')[-1]
-                    if "-" in filename_title:
-                        # Format is often "ID-Job Title.pdf"
-                        parts = filename_title.split('-', 1)
-                        if len(parts) > 1:
-                            filename_title = parts[1].replace('.pdf', '').strip()
-                    
-                    # Default values
-                    job_title = filename_title if filename_title else "Unknown Position"
-                    company = "Unknown Company"
-                    location = "Location Not Specified"
-                    job_description = ""
-                    
-                    # Try to extract job title
-                    title_match = None
-                    for pattern in [
-                        r"Job\s+Requisition\s+Title:\s*(.*?)(?:\n|$)",
-                        r"Position\s+Title:\s*(.*?)(?:\n|$)",
-                        r"Title:\s*(.*?)(?:\n|$)",
-                    ]:
-                        title_match = re.search(pattern, content, re.IGNORECASE)
-                        if title_match and title_match.group(1).strip():
-                            job_title = title_match.group(1).strip()
-                            break
-                    
-                    # Try to extract company
-                    company_match = None
-                    for pattern in [
-                        r"at\s+([\w\s]+(?:University|College|Corporation|Inc\.|LLC|Company))",
-                        r"Company:\s*(.*?)(?:\n|$)",
-                        r"Employer:\s*(.*?)(?:\n|$)",
-                        r"organization:\s*(.*?)(?:\n|$)"
-                    ]:
-                        company_match = re.search(pattern, content, re.IGNORECASE)
-                        if company_match and company_match.group(1).strip():
-                            company = company_match.group(1).strip()
-                            break
-                    
-                    # Try to extract location
-                    location_match = None
-                    for pattern in [
-                        r"Location:\s*(.*?)(?:\n|$)",
-                        r"Place:\s*(.*?)(?:\n|$)",
-                        r"(?:Full Time or Part Time).*?(?:\n|$).*?(?:Date Posted).*?(?:\n|$).*?(?:Location|Place):\s*(.*?)(?:\n|$)"
-                    ]:
-                        location_match = re.search(pattern, content, re.IGNORECASE)
-                        if location_match and location_match.group(1).strip():
-                            location = location_match.group(1).strip()
-                            break
-                    
-                    # Try to extract description
-                    description_match = re.search(
-                        r"(?:External\s+Description|Description|Responsibilities|Duties|Overview)\s*(.*?)(?=\n\n|\n[A-Z]|$)",
-                        content, 
-                        re.IGNORECASE | re.DOTALL
-                    )
-                    if description_match:
-                        job_description = description_match.group(1).strip()
-                        if len(job_description) > 200:
-                            job_description = job_description[:197] + "..."
-                    
-                    # Generate reasoning based on the job description
-                    reasoning = f"This position matches your preferences with a {score}% compatibility score."
-                    if job_description:
-                        reasoning = f"{reasoning} The role involves {job_description}"
-                    
-                    # Create job recommendation object
-                    job = {
-                        "title": job_title,
-                        "company": company,
-                        "location": location,
-                        "match_score": score,
-                        "reasoning": reasoning,
-                        "url": f"https://console.aws.amazon.com/s3/object/{bucket}/{key}"
-                    }
-                    
-                    job_recommendations.append(job)
-                    debug(f"Successfully processed job: {job_title}")
-                    
-                except Exception as e:
-                    app_logger.error(f"Error processing S3 object {s3_uri}: {str(e)}")
-                    debug(f"S3 retrieval error for {s3_uri}: {str(e)}")
-            
+                # Get the document from S3 with retry logic
+                max_s3_retries = 2
+                s3_retry_delay = 2  # seconds
+                content = None  # Initialize content variable
+                
+                for s3_attempt in range(max_s3_retries):
+                    try:
+                        debug(f"Retrieving S3 object {bucket}/{key} (attempt {s3_attempt+1}/{max_s3_retries})")
+                        obj = s3.get_object(Bucket=bucket, Key=key)
+                        content_bytes = obj["Body"].read()
+                        
+                        # Check if it's a PDF (starts with %PDF)
+                        if content_bytes.startswith(b'%PDF'):
+                            debug(f"Processing PDF document from {key}")
+                            # Parse PDF using PyPDF2
+                            pdf_reader = PyPDF2.PdfReader(io.BytesIO(content_bytes))
+                            content = ""
+                            for page in range(len(pdf_reader.pages)):
+                                content += pdf_reader.pages[page].extract_text() + "\n"
+                        else:
+                            # Assume it's plain text
+                            content = content_bytes.decode("utf-8", errors="ignore")
+                        
+                        debug(f"Content extracted, length: {len(content)} characters")
+                        break  # Success, exit retry loop
+                        
+                    except Exception as e:
+                        error_msg = str(e)
+                        debug(f"S3 retrieval error (attempt {s3_attempt+1}): {error_msg}")
+                        
+                        if s3_attempt < max_s3_retries - 1:
+                            # Still have retries left
+                            import time
+                            time.sleep(s3_retry_delay)
+                            continue
+                        else:
+                            # Last attempt failed, re-raise the exception to be caught by the outer try/except
+                            raise
+                
+                # If content retrieval failed, skip this job
+                if content is None:
+                    debug(f"Failed to retrieve content for {s3_uri}, skipping")
+                    continue
+                
+                # Extract job title from filename if possible (often contains good info)
+                filename_title = key.split('/')[-1]
+                if "-" in filename_title:
+                    # Format is often "ID-Job Title.pdf"
+                    parts = filename_title.split('-', 1)
+                    if len(parts) > 1:
+                        filename_title = parts[1].replace('.pdf', '').strip()
+                
+                # Default values
+                job_title = filename_title if filename_title else "Unknown Position"
+                company = "Unknown Company"
+                location = "Location Not Specified"
+                job_description = ""
+                
+                # Try to extract job title
+                title_match = None
+                for pattern in [
+                    r"Job\s+Requisition\s+Title:\s*(.*?)(?:\n|$)",
+                    r"Position\s+Title:\s*(.*?)(?:\n|$)",
+                    r"Title:\s*(.*?)(?:\n|$)",
+                ]:
+                    title_match = re.search(pattern, content, re.IGNORECASE)
+                    if title_match and title_match.group(1).strip():
+                        job_title = title_match.group(1).strip()
+                        break
+                
+                # Try to extract company
+                company_match = None
+                for pattern in [
+                    r"at\s+([\w\s]+(?:University|College|Corporation|Inc\.|LLC|Company))",
+                    r"Company:\s*(.*?)(?:\n|$)",
+                    r"Employer:\s*(.*?)(?:\n|$)",
+                    r"organization:\s*(.*?)(?:\n|$)"
+                ]:
+                    company_match = re.search(pattern, content, re.IGNORECASE)
+                    if company_match and company_match.group(1).strip():
+                        company = company_match.group(1).strip()
+                        break
+                
+                # Try to extract location
+                location_match = None
+                for pattern in [
+                    r"Location:\s*(.*?)(?:\n|$)",
+                    r"Place:\s*(.*?)(?:\n|$)",
+                    r"(?:Full Time or Part Time).*?(?:\n|$).*?(?:Date Posted).*?(?:\n|$).*?(?:Location|Place):\s*(.*?)(?:\n|$)"
+                ]:
+                    location_match = re.search(pattern, content, re.IGNORECASE)
+                    if location_match and location_match.group(1).strip():
+                        location = location_match.group(1).strip()
+                        break
+                
+                # Try to extract description
+                description_match = re.search(
+                    r"(?:External\s+Description|Description|Responsibilities|Duties|Overview)\s*(.*?)(?=\n\n|\n[A-Z]|$)",
+                    content, 
+                    re.IGNORECASE | re.DOTALL
+                )
+                if description_match:
+                    job_description = description_match.group(1).strip()
+                    if len(job_description) > 200:
+                        job_description = job_description[:197] + "..."
+                
+                # Generate reasoning based on the job description
+                reasoning = f"This position matches your preferences with a {score}% compatibility score."
+                if job_description:
+                    reasoning = f"{reasoning} The role involves {job_description}"
+                
+                # Create job recommendation object
+                job = {
+                    "title": job_title,
+                    "company": company,
+                    "location": location,
+                    "match_score": score,
+                    "reasoning": reasoning,
+                    "url": f"https://console.aws.amazon.com/s3/object/{bucket}/{key}"
+                }
+                
+                job_recommendations.append(job)
+                debug(f"Successfully processed job: {job_title}")
+                
             except Exception as e:
                 app_logger.error(f"Error processing result {i}: {str(e)}")
                 debug(f"Result processing error: {str(e)}")
@@ -636,6 +771,49 @@ def get_job_recommendations(analysis):
                     "location": "PLACEHOLDER",
                     "match_score": 0,
                     "reasoning": "PLACEHOLDER",
+                    "url": "https://careers.oracle.com/jobs"
+                }
+            ]
+            
+            job_recommendations = [
+                {
+                    "title": "Data Quality Analyst",
+                    "company": "Oracle",
+                    "location": "Austin, TX (Remote Available)",
+                    "match_score": 95,
+                    "reasoning": "Fallback job match for neurodiverse candidates. This role offers a structured environment with clear objectives and minimal interruptions.",
+                    "url": "https://careers.oracle.com/jobs"
+                },
+                {
+                    "title": "Software Developer - Backend",
+                    "company": "Oracle Cloud Infrastructure", 
+                    "location": "Seattle, WA (Hybrid)",
+                    "match_score": 92,
+                    "reasoning": "Fallback job match for neurodiverse candidates. This role features flexible scheduling with dedicated quiet time for deep work.",
+                    "url": "https://careers.oracle.com/jobs"
+                },
+                {
+                    "title": "Quality Assurance Engineer",
+                    "company": "Oracle",
+                    "location": "Reston, VA",
+                    "match_score": 88,
+                    "reasoning": "Fallback job match for neurodiverse candidates. This role provides structured work environment with clear processes.",
+                    "url": "https://careers.oracle.com/jobs"
+                },
+                {
+                    "title": "Technical Documentation Specialist",
+                    "company": "Oracle",
+                    "location": "Remote",
+                    "match_score": 85,
+                    "reasoning": "Fallback job match for neurodiverse candidates. This role offers flexible remote work with minimal interruptions.",
+                    "url": "https://careers.oracle.com/jobs"
+                },
+                {
+                    "title": "Database Administrator",
+                    "company": "Oracle",
+                    "location": "Denver, CO",
+                    "match_score": 82, 
+                    "reasoning": "Fallback job match for neurodiverse candidates. This role features clear procedures and predictable interactions.",
                     "url": "https://careers.oracle.com/jobs"
                 }
             ]
