@@ -1,3 +1,11 @@
+# from langtrace_python_sdk import langtrace
+# import os
+# from dotenv import load_dotenv
+# load_dotenv() 
+
+# langtrace_api_key = os.environ.get("LANGTRACE_API_KEY")
+# langtrace.init(api_key=langtrace_api_key)
+
 from crewai import Agent, Crew, Task
 import json
 import logging
@@ -5,6 +13,7 @@ import re
 from typing import Dict, Any, List, Optional
 import io
 import PyPDF2
+
 
 app_logger = logging.getLogger('app')
 
@@ -37,7 +46,13 @@ class JobAnalyzer:
             locations, and key responsibilities even when this information is embedded in
             complex documents.""",
             verbose=True,
-            allow_delegation=False
+            allow_delegation=False,
+            metadata={
+                "langtrace": {
+                    "agent_name": "job_information_extractor",
+                    "agent_type": "extraction"
+                }
+            }
         )
     
     def create_matching_agent(self) -> Agent:
@@ -50,7 +65,13 @@ class JobAnalyzer:
             of the job that align with the candidate's work style, environment needs, interaction 
             preferences, and task preferences.""",
             verbose=True,
-            allow_delegation=False
+            allow_delegation=False,
+            metadata={
+                "langtrace": {
+                    "agent_name": "job_match_analyst",
+                    "agent_type": "matching"
+                }
+            }
         )
     
     def create_extraction_task(self, agent: Agent, job_content: str, job_uri: str) -> Task:
@@ -82,7 +103,13 @@ class JobAnalyzer:
                 "requirements": "Key requirements summary",
                 "benefits": "Benefits summary or 'Not specified'"
             }
-            """
+            """,
+            metadata={
+                "langtrace": {
+                    "task_name": "job_info_extraction",
+                    "job_uri": job_uri
+                }
+            }
         )
     
     def create_matching_task(self, agent: Agent, job_info: Dict[str, Any], user_profile: Dict[str, Any]) -> Task:
@@ -113,7 +140,13 @@ class JobAnalyzer:
                     "Detailed technical tasks"
                 ]
             }
-            """
+            """,
+            metadata={
+                "langtrace": {
+                    "task_name": "job_matching_analysis",
+                    "job_title": job_info.get("title", "Unknown Position")
+                }
+            }
         )
     
     def extract_text_from_content(self, content_bytes: bytes, uri: str) -> str:
@@ -170,11 +203,17 @@ class JobAnalyzer:
             extractor = self.create_extraction_agent()
             extraction_task = self.create_extraction_task(extractor, content, s3_uri)
             
-            # Run the extraction task
+            # Run the extraction task with Langtrace tracing
             extraction_crew = Crew(
                 agents=[extractor],
                 tasks=[extraction_task],
-                verbose=True
+                verbose=True,
+                metadata={
+                    "langtrace": {
+                        "crew_name": "job_extraction_crew",
+                        "job_uri": s3_uri
+                    }
+                }
             )
             
             extraction_result = extraction_crew.kickoff()
@@ -192,11 +231,17 @@ class JobAnalyzer:
             matcher = self.create_matching_agent()
             matching_task = self.create_matching_task(matcher, job_info, self.user_profile)
             
-            # Run the matching task
+            # Run the matching task with Langtrace tracing
             matching_crew = Crew(
                 agents=[matcher],
                 tasks=[matching_task],
-                verbose=True
+                verbose=True,
+                metadata={
+                    "langtrace": {
+                        "crew_name": "job_matching_crew",
+                        "job_title": job_info.get("title", "Unknown Position")
+                    }
+                }
             )
             
             matching_result = matching_crew.kickoff()
