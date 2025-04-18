@@ -262,7 +262,7 @@ class ResponseEvaluator:
             if not evaluation["is_useful"]:
                 self.debug("Response evaluated as NOT useful, skipping OpenAI API call")
                 normalized_analysis["additional_insights"] = {
-                    "description": "Additional information not relevant for job matching",
+                    "description": "No additional insights",
                     "explanation": evaluation["reasoning"]
                 }
             else:

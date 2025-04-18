@@ -304,7 +304,7 @@ def analyze_responses(answers):
             # Agent Goal Accuracy metric - check if insights were added or modified
             goal_achieved = 0
             current_insights = normalized_analysis.get('additional_insights', {}).get('description', 'No additional insights')
-            if current_insights != 'No additional insights' and current_insights != 'No additional information provided':
+            if current_insights != 'No additional insights' and current_insights != 'Additional information provided, but couldn\'t be processed':
                 goal_achieved = 1
                 
             # Calculate time taken
@@ -457,7 +457,7 @@ def send_langtrace_metric(agent_name, metric_name, metric_value, trace_id=None, 
             },
             "scopeSpans": [{
                 "spans": [{
-                    # "traceId": trace_id,
+                    "traceId": trace_id,
                     "spanId": str(uuid.uuid4()).replace('-', '')[:16],
                     "name": f"{agent_name} metrics: {metric_name}",
                     "kind": 1,
