@@ -459,7 +459,7 @@ def send_langtrace_metric(agent_name, metric_name, metric_value, trace_id=None, 
                 "spans": [{
                     # "traceId": trace_id,
                     "spanId": str(uuid.uuid4()).replace('-', '')[:16],
-                    "name": f"{agent_name} Metrics: {metric_name}",
+                    "name": f"{agent_name} metrics: {metric_name}",
                     "kind": 1,
                     "startTimeUnixNano": str(current_time),
                     "endTimeUnixNano": str(current_time + 1000000),  # 1ms later
@@ -809,7 +809,7 @@ def get_recommendations_from_bedrock(analysis):
         # 1. Tool Call Accuracy
         send_langtrace_metric(
             "Agent job_analyzer",
-            "Metric: tool_call_accuracy",
+            "tool_call_accuracy",
             job_analyzer_metrics["tool_call_accuracy"],
             trace_id=trace_id,
             metadata={
