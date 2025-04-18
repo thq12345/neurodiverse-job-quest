@@ -168,7 +168,7 @@ class JobAnalyzer:
             self.debug(f"Error extracting text from {uri}: {str(e)}")
             return f"Error extracting text: {str(e)}"
     
-    def retrieve_and_process_content(self, s3_uri: str, score: int) -> Optional[Dict[str, Any]]:
+    def retrieve_and_process_content(self, s3_uri: str, bedrock_score: int) -> Optional[Dict[str, Any]]:
         """Retrieve job content from S3 and process it with CrewAI agents"""
         try:
             if not self.s3_client:
@@ -177,7 +177,7 @@ class JobAnalyzer:
                     "title": f"Job from {s3_uri}",
                     "company": "Unknown Company", 
                     "location": "Unknown Location",
-                    "match_score": score,
+                    "match_score": bedrock_score,
                     "reasoning": "Unable to access job details without S3 client.",
                     "url": s3_uri
                 }
@@ -252,16 +252,19 @@ class JobAnalyzer:
             if not match_info:
                 self.debug(f"Failed to generate matching info for {s3_uri}")
                 match_info = {
-                    "match_reasoning": f"This position matches your preferences with a {score}% compatibility score.",
-                    "match_score": score,
+                    "match_reasoning": f"This position matches your preferences with a {bedrock_score}% compatibility score.",
+                    "match_score": bedrock_score,
                     "key_highlights": ["Job details extracted successfully"]
                 }
             
-            # Calculate final score (average of bedrock score and agent score)
+            # Calculate final score - simple average of Bedrock score and agent score
             if 'match_score' in match_info:
-                final_score = (score + match_info['match_score']) // 2
+                agent_score = match_info['match_score']
+                # Simple average of Bedrock and agent scores
+                final_score = (bedrock_score + agent_score) // 2
+                self.debug(f"Score calculation: Bedrock score {bedrock_score} + Agent score {agent_score} = Average {final_score}")
             else:
-                final_score = score
+                final_score = bedrock_score
                 
             # Combine the extracted info and matching info
             result = {
@@ -271,7 +274,9 @@ class JobAnalyzer:
                 "match_score": final_score,
                 "reasoning": match_info.get("match_reasoning", f"This position matches your preferences with a {final_score}% compatibility score."),
                 "highlights": match_info.get("key_highlights", []),
-                "url": f"https://console.aws.amazon.com/s3/object/{bucket}/{key}"
+                "url": f"https://console.aws.amazon.com/s3/object/{bucket}/{key}",
+                "bedrock_score": bedrock_score,  # Include the original Bedrock score for reference
+                "agent_score": match_info.get("match_score", 0)  # Include the agent score for reference
             }
             
             return result
@@ -304,20 +309,41 @@ class JobAnalyzer:
             self.debug(f"Error parsing JSON result: {str(e)}")
             return {}
     
-    def process_job_results(self, retrieval_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Process a list of Bedrock retrieval results into structured job recommendations"""
+    def process_job_results(self, retrieval_results: List[Dict[str, Any]], bedrock_score: int = None) -> List[Dict[str, Any]]:
+        """
+        Process a list of Bedrock retrieval results into structured job recommendations
+        
+        Args:
+            retrieval_results: List of retrieval results from Bedrock
+            bedrock_score: Optional consistent bedrock score to use for all recommendations (0-100)
+        
+        Returns:
+            List of structured job recommendations
+        """
         job_recommendations = []
         
         for i, result in enumerate(retrieval_results):
             try:
                 # Extract S3 location information
                 s3_uri = result["location"]["s3Location"]["uri"]
-                score = int(float(result.get("score", 0.5)) * 100)  # Convert score to percentage
                 
-                self.debug(f"Processing result {i+1} with score {score}, URI: {s3_uri}")
+                # Use the provided consistent bedrock_score if available
+                if bedrock_score is not None:
+                    current_bedrock_score = bedrock_score
+                    self.debug(f"Using consistent Bedrock score {current_bedrock_score} for all recommendations")
+                else:
+                    # Otherwise calculate individual scores
+                    if 'score' in result:
+                        current_bedrock_score = int(float(result['score']) * 100)
+                    elif 'metadata' in result and 'score' in result['metadata']:
+                        current_bedrock_score = int(float(result['metadata']['score']) * 100)
+                    else:
+                        current_bedrock_score = 75  # Default score if not available
+                
+                self.debug(f"Processing result {i+1} with Bedrock score {current_bedrock_score}, URI: {s3_uri}")
                 
                 # Process the job content with CrewAI
-                job_info = self.retrieve_and_process_content(s3_uri, score)
+                job_info = self.retrieve_and_process_content(s3_uri, current_bedrock_score)
                 
                 if job_info:
                     job_recommendations.append(job_info)

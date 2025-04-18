@@ -786,14 +786,20 @@ def get_recommendations_from_bedrock(analysis):
                     # If we have scores, calculate an average relevancy
                     if scores:
                         avg_score = sum(scores) / len(scores)
-                        # Normalize to 0-1 scale if needed (assuming scores might be in different ranges)
-                        # Vector similarity scores are often already in 0-1 range
-                        bedrock_metrics["response_relevancy"] = min(1.0, max(0.0, avg_score))
+                        # Raw score without normalization
+                        bedrock_metrics["response_relevancy"] = avg_score
+                        
+                        # Convert to percentage for display (0-100 scale)
+                        bedrock_relevancy_percentage = int(avg_score * 100)
+                        debug(f"Average Bedrock relevancy: {bedrock_relevancy_percentage}%")
                     else:
                         # If we don't have explicit scores but have results, give a moderate score
-                        # More results generally indicate better relevancy
-                        result_count_factor = min(1.0, len(retrieval_results) / 10.0)
-                        bedrock_metrics["response_relevancy"] = 0.5 + (result_count_factor * 0.3)
+                        bedrock_metrics["response_relevancy"] = 0.5
+                        bedrock_relevancy_percentage = 50
+                        debug("No explicit relevance scores, using default 50%")
+                else:
+                    bedrock_metrics["response_relevancy"] = 0
+                    bedrock_relevancy_percentage = 0
                 
                 break  # Successful, exit the retry loop
                 
@@ -824,14 +830,15 @@ def get_recommendations_from_bedrock(analysis):
             metadata={
                 "query": query[:100],  # Truncate long queries
                 "retrieval_count": bedrock_metrics["retrieval_count"],
-                "query_constructed": str(bedrock_metrics["query_constructed"])
+                "query_constructed": str(bedrock_metrics["query_constructed"]),
+                "score_calculation": "Raw vector similarity score without normalization"
             }
         )
         
         if not retrieval_results:
             debug("No results retrieved from Bedrock, using fallback recommendations")
             return get_fallback_recommendations()
-        
+            
         # Extract user profile from the analysis HTML for personalized job matching
         user_profile = extract_user_profile_from_analysis(analysis)
         debug(f"Extracted user profile for job matching: {user_profile}")
@@ -849,7 +856,8 @@ def get_recommendations_from_bedrock(analysis):
         # Process all retrieved job results with CrewAI agents
         debug("Processing job results with CrewAI agents")
         try:
-            job_recommendations = job_analyzer.process_job_results(retrieval_results)
+            # Use the consistent bedrock_relevancy_percentage for all job recommendations
+            job_recommendations = job_analyzer.process_job_results(retrieval_results, bedrock_relevancy_percentage)
             
             # Tool Call Accuracy - successful if we got recommendations
             if job_recommendations and len(job_recommendations) > 0:
@@ -858,6 +866,31 @@ def get_recommendations_from_bedrock(analysis):
                 # Agent Goal Accuracy - successful if we have reasoning for at least one job
                 if any("reasoning" in job for job in job_recommendations):
                     job_analyzer_metrics["agent_goal_accuracy"] = 1
+                    
+                # Also send average match score as a separate metric
+                try:
+                    # We expect bedrock_score to be consistent across all recommendations
+                    # since we're using the same bedrock_relevancy_percentage
+                    avg_bedrock_score = bedrock_relevancy_percentage
+                    avg_agent_score = sum(job.get("agent_score", 0) for job in job_recommendations) / len(job_recommendations)
+                    avg_final_score = sum(job.get("match_score", 0) for job in job_recommendations) / len(job_recommendations)
+                    
+                    send_langtrace_metric(
+                        "Bedrock Knowledge Base",
+                        "average_match_score",
+                        str(avg_final_score),
+                        trace_id=str(uuid.uuid4()),
+                        metadata={
+                            "avg_bedrock_score": str(avg_bedrock_score),
+                            "avg_agent_score": str(avg_agent_score),
+                            "recommendation_count": len(job_recommendations),
+                            "score_formula": "Simple average of (Bedrock similarity + Agent analysis)",
+                            "using_consistent_bedrock_score": "true"
+                        }
+                    )
+                except Exception as e:
+                    app_logger.error(f"Error calculating average scores: {str(e)}")
+                    debug(f"Error in average score calculation: {str(e)}")
             
             job_analyzer_metrics["execution_time"] = time.time() - start_time
                 
