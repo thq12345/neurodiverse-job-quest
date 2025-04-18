@@ -21,6 +21,9 @@ import io
 import PyPDF2
 from response_evaluator import ResponseEvaluator
 from job_analyzer import JobAnalyzer
+import uuid
+import time
+import requests
 
 # Initialize AWS session
 aws_session = boto3.Session(
@@ -250,6 +253,12 @@ def results():
 def analyze_responses(answers):
     debug("Starting response analysis")
     
+    # Import time module explicitly to avoid scope issues
+    import time
+    
+    # Generate a trace ID for this analysis session
+    trace_id = str(uuid.uuid4())
+    
     # Extract the first 4 multiple-choice answers from the session (if available)
     mc_answers = []
     for i in range(4):  # First 4 questions are multiple choice
@@ -272,6 +281,9 @@ def analyze_responses(answers):
         # Get the free response answer (if provided)
         free_response = session.get("q5", "")
         
+        # Start time for metrics
+        start_time = time.time()
+        
         # Initialize the CrewAI-based response evaluator
         evaluator = ResponseEvaluator(
             openai_client=client if openai_api_key else None,
@@ -279,7 +291,58 @@ def analyze_responses(answers):
         )
         
         # Process the free response using the evaluator
-        normalized_analysis = evaluator.get_additional_insights(free_response, normalized_analysis)
+        try:
+            # Store original normalized_analysis for comparison
+            original_additional_insights = normalized_analysis.get('additional_insights', {}).get('description', 'No additional insights') if normalized_analysis else {}
+            
+            # Call the evaluator
+            normalized_analysis = evaluator.get_additional_insights(free_response, normalized_analysis)
+            
+            # Tool Call Accuracy metric (1 = success)
+            tool_call_accuracy = 1
+            
+            # Agent Goal Accuracy metric - check if insights were added or modified
+            goal_achieved = 0
+            current_insights = normalized_analysis.get('additional_insights', {}).get('description', 'No additional insights')
+            if current_insights != 'No additional insights' and current_insights != 'No additional information provided':
+                goal_achieved = 1
+                
+            # Calculate time taken
+            time_taken = time.time() - start_time
+            
+            # Log metrics collection
+            app_logger.info(f"Collecting metrics for ResponseEvaluator - tool_call_accuracy: {tool_call_accuracy}, agent_goal_accuracy: {goal_achieved}")
+                
+        except Exception as e:
+            app_logger.error(f"Error in ResponseEvaluator: {str(e)}")
+            tool_call_accuracy = 0
+            goal_achieved = 0
+            time_taken = time.time() - start_time
+        
+        # Send metrics to Langtrace
+        # 1. Tool Call Accuracy
+        send_langtrace_metric(
+            "tool_call_accuracy",
+            tool_call_accuracy,
+            trace_id=trace_id,
+            metadata={
+                "agent_name": "response_evaluator",
+                "response_length": len(free_response),
+                "time_taken": str(time_taken)
+            }
+        )
+        
+        # 2. Agent Goal Accuracy
+        send_langtrace_metric(
+            "agent_goal_accuracy",
+            goal_achieved,
+            trace_id=trace_id,
+            metadata={
+                "agent_name": "response_evaluator",
+                "response_length": len(free_response),
+                "has_openai_client": str(openai_api_key is not None)
+            }
+        )
         
         return format_analysis(normalized_analysis)
 
@@ -309,28 +372,28 @@ def format_analysis(analysis):
             
         # Format the HTML output
         html_output = f"""
-<div class='analysis-section'>
-    <h3>Work Style</h3>
-    <p class="mb-2"><strong>{analysis['work_style'].get('description', 'Not available')}</strong></p>
-    <p class="text-muted mb-4">{analysis['work_style'].get('explanation', '')}</p>
+        <div class='analysis-section'>
+            <h3>Work Style</h3>
+            <p class="mb-2"><strong>{analysis['work_style'].get('description', 'Not available')}</strong></p>
+            <p class="text-muted mb-4">{analysis['work_style'].get('explanation', '')}</p>
 
-    <h3>Ideal Environment</h3>
-    <p class="mb-2"><strong>{analysis['environment'].get('description', 'Not available')}</strong></p>
-    <p class="text-muted mb-4">{analysis['environment'].get('explanation', '')}</p>
+            <h3>Ideal Environment</h3>
+            <p class="mb-2"><strong>{analysis['environment'].get('description', 'Not available')}</strong></p>
+            <p class="text-muted mb-4">{analysis['environment'].get('explanation', '')}</p>
 
-    <h3>Interaction Level</h3>
-    <p class="mb-2"><strong>{analysis['interaction_level'].get('description', 'Not available')}</strong></p>
-    <p class="text-muted mb-4">{analysis['interaction_level'].get('explanation', '')}</p>
+            <h3>Interaction Level</h3>
+            <p class="mb-2"><strong>{analysis['interaction_level'].get('description', 'Not available')}</strong></p>
+            <p class="text-muted mb-4">{analysis['interaction_level'].get('explanation', '')}</p>
 
-    <h3>Task Preferences</h3>
-    <p class="mb-2"><strong>{analysis['task_preference'].get('description', 'Not available')}</strong></p>
-    <p class="text-muted mb-4">{analysis['task_preference'].get('explanation', '')}</p>
-    
-    <h3>Additional Insights</h3>
-    <p class="mb-2"><strong>{analysis.get('additional_insights', {}).get('description', 'No additional insights')}</strong></p>
-    <p class="text-muted mb-4">{analysis.get('additional_insights', {}).get('explanation', '')}</p>
-</div>
-"""
+            <h3>Task Preferences</h3>
+            <p class="mb-2"><strong>{analysis['task_preference'].get('description', 'Not available')}</strong></p>
+            <p class="text-muted mb-4">{analysis['task_preference'].get('explanation', '')}</p>
+            
+            <h3>Additional Insights</h3>
+            <p class="mb-2"><strong>{analysis.get('additional_insights', {}).get('description', 'No additional insights')}</strong></p>
+            <p class="text-muted mb-4">{analysis.get('additional_insights', {}).get('explanation', '')}</p>
+        </div>
+        """
         debug(f"Successfully formatted analysis into HTML: {html_output[:50]}...")
         return html_output
         
@@ -346,6 +409,82 @@ def format_analysis(analysis):
     <p class="text-muted mb-4">Please try again or contact support if the issue persists.</p>
 </div>
 """
+
+# Function to send metrics to langtrace
+def send_langtrace_metric(metric_name, metric_value, trace_id=None, metadata=None):
+    """
+    Send a metric to langtrace
+    
+    Args:
+        metric_name: Name of the metric
+        metric_value: Value of the metric (will be converted to string)
+        trace_id: Optional trace ID for grouping
+        metadata: Optional metadata dictionary
+    """
+    if not langtrace_api_key:
+        app_logger.warning("Langtrace API key not found, skipping metric tracking")
+        return
+        
+    trace_id = trace_id or str(uuid.uuid4())
+    str_value = str(metric_value)  # Convert to string as required
+    
+    # Prepare the payload
+    current_time = int(time.time() * 1000000000)  # Current time in nanoseconds
+    
+    # Define attributes as an array of key-value pairs, which is what OpenTelemetry expects
+    resource_attributes = [
+        {"key": "service.name", "value": {"stringValue": "neurodiverse-job-quest"}},
+        {"key": "service.version", "value": {"stringValue": "1.0.0"}}
+    ]
+    
+    # Create span attributes as an array too
+    span_attributes = [
+        {"key": "metric.name", "value": {"stringValue": metric_name}},
+        {"key": "metric.value", "value": {"stringValue": str_value}}
+    ]
+    
+    # Add metadata as additional attributes if provided
+    if metadata:
+        metadata_str = json.dumps(metadata)
+        span_attributes.append({"key": "metric.metadata", "value": {"stringValue": metadata_str}})
+    
+    payload = {
+        "resourceSpans": [{
+            "resource": {
+                "attributes": resource_attributes
+            },
+            "scopeSpans": [{
+                "spans": [{
+                    "traceId": trace_id,
+                    "spanId": str(uuid.uuid4()).replace('-', '')[:16],
+                    "name": f"Metric: {metric_name}",
+                    "kind": 1,
+                    "startTimeUnixNano": str(current_time),
+                    "endTimeUnixNano": str(current_time + 1000000),  # 1ms later
+                    "attributes": span_attributes
+                }]
+            }]
+        }]
+    }
+    
+    # Send to Langtrace
+    try:
+        url = 'https://app.langtrace.ai/api/trace'
+        headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'opentelemetry-python',
+            'x-api-key': langtrace_api_key
+        }
+        
+        app_logger.info(f"Sending {metric_name} metric to Langtrace: {str_value}")
+        response = requests.post(url, headers=headers, json=payload)
+        
+        if response.status_code != 200:
+            app_logger.error(f"Failed to send metric to Langtrace: {response.text}")
+        else:
+            app_logger.info(f"Successfully sent {metric_name} metric to Langtrace")
+    except Exception as e:
+        app_logger.error(f"Error sending metric to Langtrace: {str(e)}")
 
 # DynamoDB data formatting
 def normalize_analysis_data(analysis_data):
@@ -527,6 +666,17 @@ def get_recommendations_from_dynamo():
 # Get job recommendations from Bedrock knowledge base
 def get_recommendations_from_bedrock(analysis):
     """Get job recommendations from Bedrock knowledge base"""
+    # Import time module explicitly to avoid scope issues
+    import time
+    
+    # Generate a trace ID for this job recommendation process
+    trace_id = str(uuid.uuid4())
+    job_analyzer_metrics = {
+        "tool_call_accuracy": 0,
+        "agent_goal_accuracy": 0,
+        "execution_time": 0
+    }
+    
     try:
         # Extract key points from the analysis to form a query
         query = "Find job postings suitable for someone who:"
@@ -596,14 +746,12 @@ def get_recommendations_from_bedrock(analysis):
                 
                 # Check if this is the auto-pause resumption error
                 if "resuming after being auto-paused" in error_msg and attempt < max_retries - 1:
-                    import time
                     wait_time = retry_delay * (attempt + 1)  # Exponential backoff
                     debug(f"Vector database is resuming after auto-pause. Waiting {wait_time} seconds before retry...")
                     time.sleep(wait_time)
                     continue  # Try again
                 elif attempt < max_retries - 1:
                     # Other error but still have retries left
-                    import time
                     time.sleep(retry_delay)
                     continue
                 else:
@@ -625,13 +773,61 @@ def get_recommendations_from_bedrock(analysis):
             user_profile=user_profile
         )
         
+        # Start time for metrics
+        start_time = time.time()
+        
         # Process all retrieved job results with CrewAI agents
         debug("Processing job results with CrewAI agents")
-        job_recommendations = job_analyzer.process_job_results(retrieval_results)
+        try:
+            job_recommendations = job_analyzer.process_job_results(retrieval_results)
+            
+            # Tool Call Accuracy - successful if we got recommendations
+            if job_recommendations and len(job_recommendations) > 0:
+                job_analyzer_metrics["tool_call_accuracy"] = 1
+                
+                # Agent Goal Accuracy - successful if we have reasoning for at least one job
+                if any("reasoning" in job for job in job_recommendations):
+                    job_analyzer_metrics["agent_goal_accuracy"] = 1
+            
+            job_analyzer_metrics["execution_time"] = time.time() - start_time
+                
+        except Exception as e:
+            app_logger.error(f"Error in JobAnalyzer: {str(e)}")
+            job_analyzer_metrics["tool_call_accuracy"] = 0
+            job_analyzer_metrics["agent_goal_accuracy"] = 0
+            job_analyzer_metrics["execution_time"] = time.time() - start_time
+            job_recommendations = []
         
         if not job_recommendations:
             debug("No valid job recommendations generated, using fallback")
-            return get_fallback_recommendations()
+            job_recommendations = get_fallback_recommendations()
+            
+        # Send metrics to Langtrace
+        debug("Sending JobAnalyzer metrics to Langtrace")
+        # 1. Tool Call Accuracy
+        send_langtrace_metric(
+            "tool_call_accuracy",
+            job_analyzer_metrics["tool_call_accuracy"],
+            trace_id=trace_id,
+            metadata={
+                "agent_name": "job_analyzer",
+                "num_results": len(retrieval_results),
+                "num_recommendations": len(job_recommendations),
+                "execution_time": str(job_analyzer_metrics["execution_time"])
+            }
+        )
+        
+        # 2. Agent Goal Accuracy
+        send_langtrace_metric(
+            "agent_goal_accuracy",
+            job_analyzer_metrics["agent_goal_accuracy"],
+            trace_id=trace_id,
+            metadata={
+                "agent_name": "job_analyzer",
+                "num_results": len(retrieval_results),
+                "num_recommendations": len(job_recommendations)
+            }
+        )
             
         debug(f"Successfully processed {len(job_recommendations)} job recommendations")
         return job_recommendations
@@ -639,6 +835,28 @@ def get_recommendations_from_bedrock(analysis):
     except Exception as e:
         app_logger.error(f"Error in get_recommendations_from_bedrock: {str(e)}")
         debug(f"Bedrock recommendation error: {str(e)}")
+        
+        # Send failure metrics to Langtrace
+        send_langtrace_metric(
+            "tool_call_accuracy",
+            0,
+            trace_id=trace_id,
+            metadata={
+                "agent_name": "job_analyzer",
+                "error": str(e)[:100]  # Truncate long error messages
+            }
+        )
+        
+        send_langtrace_metric(
+            "agent_goal_accuracy",
+            0,
+            trace_id=trace_id,
+            metadata={
+                "agent_name": "job_analyzer",
+                "error": str(e)[:100]  # Truncate long error messages
+            }
+        )
+        
         return get_fallback_recommendations()
 
 def extract_user_profile_from_analysis(analysis):
