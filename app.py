@@ -281,7 +281,30 @@ def analyze_responses(answers):
         # Get the free response answer (if provided)
         free_response = session.get("q5", "")
         
-        # Start time for metrics
+        # Check if free response is empty or just whitespace
+        if not free_response or not free_response.strip():
+            debug("Free response is empty, skipping ResponseEvaluator")
+            
+            # Add default additional insights without calling ResponseEvaluator
+            normalized_analysis["additional_insights"] = {
+                "description": "No additional information provided",
+                "explanation": "You did not provide any additional context about your work preferences."
+            }
+            
+            # Record skipped metrics
+            send_langtrace_metric(
+                "Agent response_evaluator",
+                "skipped_evaluation",
+                "1",
+                trace_id=str(uuid.uuid4()),
+                metadata={
+                    "reason": "empty_input"
+                }
+            )
+            
+            return format_analysis(normalized_analysis)
+        
+        # Start time for metrics - only if we have non-empty free response
         start_time = time.time()
         
         # Initialize the CrewAI-based response evaluator
@@ -679,6 +702,13 @@ def get_recommendations_from_bedrock(analysis):
         "execution_time": 0
     }
     
+    # Metrics for Bedrock Knowledge Base
+    bedrock_metrics = {
+        "response_relevancy": 0.0,
+        "query_constructed": False,
+        "retrieval_count": 0
+    }
+    
     try:
         # Extract key points from the analysis to form a query
         query = "Find job postings suitable for someone who:"
@@ -719,6 +749,7 @@ def get_recommendations_from_bedrock(analysis):
                     query = "Find tech jobs suitable for neurodiverse candidates with various work preferences"
         
         debug(f"Query for Bedrock: {query}")
+        bedrock_metrics["query_constructed"] = True
         
         # Query the Bedrock knowledge base with retry logic for auto-pause situations
         retrieval_results = []
@@ -739,7 +770,31 @@ def get_recommendations_from_bedrock(analysis):
                 )
                 
                 retrieval_results = response.get('retrievalResults', [])
+                bedrock_metrics["retrieval_count"] = len(retrieval_results)
                 debug(f"Retrieved {len(retrieval_results)} results from Bedrock")
+                
+                # Calculate response relevancy based on results
+                if retrieval_results:
+                    # If we have results, check for relevance scores if available
+                    scores = []
+                    for result in retrieval_results:
+                        if 'score' in result:
+                            scores.append(float(result['score']))
+                        elif 'metadata' in result and 'score' in result['metadata']:
+                            scores.append(float(result['metadata']['score']))
+                    
+                    # If we have scores, calculate an average relevancy
+                    if scores:
+                        avg_score = sum(scores) / len(scores)
+                        # Normalize to 0-1 scale if needed (assuming scores might be in different ranges)
+                        # Vector similarity scores are often already in 0-1 range
+                        bedrock_metrics["response_relevancy"] = min(1.0, max(0.0, avg_score))
+                    else:
+                        # If we don't have explicit scores but have results, give a moderate score
+                        # More results generally indicate better relevancy
+                        result_count_factor = min(1.0, len(retrieval_results) / 10.0)
+                        bedrock_metrics["response_relevancy"] = 0.5 + (result_count_factor * 0.3)
+                
                 break  # Successful, exit the retry loop
                 
             except Exception as e:
@@ -759,6 +814,19 @@ def get_recommendations_from_bedrock(analysis):
                 else:
                     # Last attempt failed, log and continue with empty results
                     app_logger.error(f"Error querying Bedrock after {max_retries} attempts: {error_msg}")
+        
+        # Send Response Relevancy metric to Langtrace for Bedrock
+        send_langtrace_metric(
+            "Bedrock Knowledge Base",
+            "response_relevancy",
+            bedrock_metrics["response_relevancy"],
+            trace_id=str(uuid.uuid4()),
+            metadata={
+                "query": query[:100],  # Truncate long queries
+                "retrieval_count": bedrock_metrics["retrieval_count"],
+                "query_constructed": str(bedrock_metrics["query_constructed"])
+            }
+        )
         
         if not retrieval_results:
             debug("No results retrieved from Bedrock, using fallback recommendations")
