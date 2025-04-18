@@ -322,6 +322,7 @@ def analyze_responses(answers):
         # Send metrics to Langtrace
         # 1. Tool Call Accuracy
         send_langtrace_metric(
+            "Agent response_evaluator",
             "tool_call_accuracy",
             tool_call_accuracy,
             trace_id=trace_id,
@@ -334,6 +335,7 @@ def analyze_responses(answers):
         
         # 2. Agent Goal Accuracy
         send_langtrace_metric(
+            "Agent response_evaluator",
             "agent_goal_accuracy",
             goal_achieved,
             trace_id=trace_id,
@@ -411,7 +413,7 @@ def format_analysis(analysis):
 """
 
 # Function to send metrics to langtrace
-def send_langtrace_metric(metric_name, metric_value, trace_id=None, metadata=None):
+def send_langtrace_metric(agent_name, metric_name, metric_value, trace_id=None, metadata=None):
     """
     Send a metric to langtrace
     
@@ -455,9 +457,9 @@ def send_langtrace_metric(metric_name, metric_value, trace_id=None, metadata=Non
             },
             "scopeSpans": [{
                 "spans": [{
-                    "traceId": trace_id,
+                    # "traceId": trace_id,
                     "spanId": str(uuid.uuid4()).replace('-', '')[:16],
-                    "name": f"Metric: {metric_name}",
+                    "name": f"{agent_name} Metrics: {metric_name}",
                     "kind": 1,
                     "startTimeUnixNano": str(current_time),
                     "endTimeUnixNano": str(current_time + 1000000),  # 1ms later
@@ -806,7 +808,8 @@ def get_recommendations_from_bedrock(analysis):
         debug("Sending JobAnalyzer metrics to Langtrace")
         # 1. Tool Call Accuracy
         send_langtrace_metric(
-            "tool_call_accuracy",
+            "Agent job_analyzer",
+            "Metric: tool_call_accuracy",
             job_analyzer_metrics["tool_call_accuracy"],
             trace_id=trace_id,
             metadata={
@@ -819,6 +822,7 @@ def get_recommendations_from_bedrock(analysis):
         
         # 2. Agent Goal Accuracy
         send_langtrace_metric(
+            "Agent job_analyzer",
             "agent_goal_accuracy",
             job_analyzer_metrics["agent_goal_accuracy"],
             trace_id=trace_id,
@@ -838,6 +842,7 @@ def get_recommendations_from_bedrock(analysis):
         
         # Send failure metrics to Langtrace
         send_langtrace_metric(
+            "Agent job_analyzer",
             "tool_call_accuracy",
             0,
             trace_id=trace_id,
@@ -848,6 +853,7 @@ def get_recommendations_from_bedrock(analysis):
         )
         
         send_langtrace_metric(
+            "Agent job_analyzer",
             "agent_goal_accuracy",
             0,
             trace_id=trace_id,
