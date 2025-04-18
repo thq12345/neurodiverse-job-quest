@@ -1,3 +1,11 @@
+# from langtrace_python_sdk import langtrace
+# import os
+# from dotenv import load_dotenv
+# load_dotenv() 
+
+# langtrace_api_key = os.environ.get("LANGTRACE_API_KEY")
+# langtrace.init(api_key=langtrace_api_key)
+
 from crewai import Agent, Crew, Task
 import json
 import logging
@@ -32,7 +40,14 @@ class ResponseEvaluator:
             meaningful information about a person's work preferences, strengths, or job-related needs.
             You can identify when text is too vague, off-topic, or doesn't add value to job recommendations.""",
             verbose=True,
-            allow_delegation=False
+            allow_delegation=False,
+            # Add Langtrace metadata for agent tracing
+            metadata={
+                "langtrace": {
+                    "agent_name": "response_evaluator",
+                    "agent_type": "evaluation"
+                }
+            }
         )
     
     def create_evaluation_task(self, agent: Agent, free_response: str) -> Task:
@@ -54,7 +69,14 @@ class ResponseEvaluator:
                 "is_useful": true/false,
                 "reasoning": "explanation"
             }
-            """
+            """,
+            # Add Langtrace metadata for task tracing
+            metadata={
+                "langtrace": {
+                    "task_name": "response_evaluation",
+                    "response_length": len(free_response)
+                }
+            }
         )
         
     def evaluate_response(self, free_response: str) -> Dict[str, Any]:
@@ -90,7 +112,14 @@ class ResponseEvaluator:
             crew = Crew(
                 agents=[evaluator],
                 tasks=[evaluation_task],
-                verbose=True
+                verbose=True,
+                # Add Langtrace metadata for crew tracing
+                metadata={
+                    "langtrace": {
+                        "crew_name": "response_evaluation_crew",
+                        "response_snippet": free_response[:50] + ("..." if len(free_response) > 50 else "")
+                    }
+                }
             )
             
             # Run the evaluation
@@ -233,7 +262,7 @@ class ResponseEvaluator:
             if not evaluation["is_useful"]:
                 self.debug("Response evaluated as NOT useful, skipping OpenAI API call")
                 normalized_analysis["additional_insights"] = {
-                    "description": "Additional information not relevant for job matching",
+                    "description": "No additional insights",
                     "explanation": evaluation["reasoning"]
                 }
             else:
