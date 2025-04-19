@@ -1,0 +1,184 @@
+/* Main Styles for Neurodiverse Job Quest */
+
+:root {
+    --primary-color: #6366f1;
+    --primary-hover: #4f46e5;
+    --secondary-color: #10b981;
+    --light-bg: #f9fafb;
+    --dark-text: #1f2937;
+    --light-text: #6b7280;
+    --white: #ffffff;
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: var(--dark-text);
+    background-color: var(--light-bg);
+    padding: 20px 0;
+}
+
+h1, h2, h3, h4 {
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.container {
+    max-width: 800px;
+}
+
+/* Card styling */
+.card {
+    border-radius: 8px;
+    box-shadow: var(--card-shadow);
+    border: none;
+    margin-bottom: 2rem;
+}
+
+.card-body {
+    padding: 2rem;
+}
+
+/* Button styling */
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-primary:hover, .btn-primary:focus {
+    background-color: var(--primary-hover);
+    border-color: var(--primary-hover);
+}
+
+/* Page transitions */
+.page {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+}
+
+.page.active {
+    display: block;
+    opacity: 1;
+}
+
+/* Question styling */
+.question {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.question:last-child {
+    border-bottom: none;
+}
+
+.question-text {
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+}
+
+.options-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.option {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.option:hover {
+    background-color: #f3f4f6;
+}
+
+.option.selected {
+    background-color: #eff6ff;
+    border-color: var(--primary-color);
+}
+
+.option-radio {
+    margin-right: 0.75rem;
+}
+
+/* Job recommendation card */
+.job-card {
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.job-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--card-shadow);
+}
+
+.job-title {
+    font-weight: 600;
+    font-size: 1.2rem;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+.job-description {
+    margin-bottom: 1rem;
+    color: var(--dark-text);
+}
+
+.fit-score {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background-color: #ecfdf5;
+    color: var(--secondary-color);
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+.strengths-match, .considerations {
+    margin-bottom: 0.5rem;
+}
+
+.strengths-match h5, .considerations h5 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.strengths-match ul, .considerations ul {
+    padding-left: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Form Elements */
+textarea.form-control {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* Loading spinner */
+.loading {
+    padding: 2rem 0;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .container {
+        padding: 0 15px;
+    }
+    
+    .card-body {
+        padding: 1.5rem;
+    }
+} 
