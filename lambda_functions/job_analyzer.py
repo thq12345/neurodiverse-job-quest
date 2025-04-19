@@ -196,7 +196,7 @@ class JobAnalyzer:
                 
                 # Retrieve from S3
                 max_retries = 3
-                retry_delay = 1  # second
+                retry_delay = 10  # second
                 
                 for attempt in range(max_retries):
                     try:
