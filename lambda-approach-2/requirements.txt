@@ -1,0 +1,5 @@
+openai>=1.0.0
+boto3>=1.28.0
+python-dotenv>=1.0.0
+langtrace-python-sdk>=0.1.0
+requests>=2.31.0 

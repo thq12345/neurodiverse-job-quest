@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neurodiverse Job Quest</title>
+    <link rel="stylesheet" href="static/css/styles.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="mb-5 text-center py-4">
+            <h1>Neurodiverse Job Quest</h1>
+            <p class="lead">Find your career match based on your unique strengths and preferences</p>
+        </header>
+
+        <main id="app">
+            <!-- Welcome Page -->
+            <div id="welcome-page" class="page active">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h2 class="card-title mb-4">Welcome to Neurodiverse Job Quest</h2>
+                        <p class="card-text mb-4">
+                            This tool helps you find career paths that align with your unique strengths, 
+                            preferences, and working style. Complete a short questionnaire to receive 
+                            personalized job recommendations.
+                        </p>
+                        <button id="start-btn" class="btn btn-primary btn-lg">Start Questionnaire</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Questionnaire Page -->
+            <div id="questionnaire-page" class="page">
+                <div class="card">
+                    <div class="card-body">
+                        <h2 class="card-title mb-4 text-center">Questionnaire</h2>
+                        <form id="questionnaire-form">
+                            <div id="questions-container">
+                                <!-- Questions will be loaded here -->
+                                <div class="text-center mt-4 loading">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p>Loading questions...</p>
+                                </div>
+                            </div>
+                            <div class="text-center mt-4">
+                                <button type="submit" class="btn btn-primary btn-lg">Submit Answers</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Page -->
+            <div id="results-page" class="page">
+                <div class="card">
+                    <div class="card-body">
+                        <h2 class="card-title mb-4 text-center">Your Results</h2>
+                        
+                        <div id="results-loading" class="text-center mt-4">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p>Analyzing your responses...</p>
+                        </div>
+                        
+                        <div id="results-content" style="display: none;">
+                            <div class="row mb-5">
+                                <div class="col-md-12">
+                                    <h3>Your Profile</h3>
+                                    <div class="card mb-3">
+                                        <div class="card-body">
+                                            <h4>Strengths</h4>
+                                            <ul id="strengths-list"></ul>
+                                            
+                                            <h4>Working Style</h4>
+                                            <p id="work-style"></p>
+                                            
+                                            <h4>Ideal Environment</h4>
+                                            <p id="environment"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <h3>Job Recommendations</h3>
+                                    <div id="recommendations-container"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="mt-5 py-3 text-center text-muted">
+            <p>&copy; 2025 Neurodiverse Job Quest</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="static/js/api.js"></script>
+    <script src="static/js/app.js"></script>
+</body>
+</html> 
