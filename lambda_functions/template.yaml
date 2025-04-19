@@ -6,7 +6,7 @@ Globals:
   Function:
     Timeout: 30
     MemorySize: 512
-    Runtime: python3.11
+    # Runtime: python3.11
     Architectures:
       - x86_64
     Environment:
@@ -67,13 +67,13 @@ Resources:
   InitFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ./
-      Handler: app_init.handler
+      PackageType: Image
+      ImageUri: 340752828591.dkr.ecr.us-east-1.amazonaws.com/my-lambda-repo:latest
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref AssessmentsTable
-        - DynamoDBTablePolicy:
-            TableName: !Ref AssessmentsTable
+        # - DynamoDBTablePolicy:
+        #     TableName: !Ref AssessmentsTable
       Environment:
         Variables:
           TABLE_NAME: !Ref AssessmentsTable
@@ -81,8 +81,8 @@ Resources:
   QuestionnaireFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ./
-      Handler: questionnaire_api.handler
+      PackageType: Image
+      ImageUri: 340752828591.dkr.ecr.us-east-1.amazonaws.com/my-lambda-repo:latest
       Events:
         GetQuestionnaire:
           Type: Api
@@ -99,13 +99,13 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref AssessmentsTable
-      DependsOn: InitFunction
+      # DependsOn: InitFunction
 
   ResultsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ./
-      Handler: results_api.handler
+      PackageType: Image
+      ImageUri: 340752828591.dkr.ecr.us-east-1.amazonaws.com/my-lambda-repo:latest
       Events:
         GetResults:
           Type: Api
@@ -117,13 +117,13 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref AssessmentsTable
         - AWSLambdaBasicExecutionRole
-      DependsOn: InitFunction
+      # DependsOn: InitFunction
 
   FrontendProxyFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ./
-      Handler: frontend_proxy.handler
+      PackageType: Image
+      ImageUri: 340752828591.dkr.ecr.us-east-1.amazonaws.com/my-lambda-repo:latest
       Events:
         ProxyAPI:
           Type: Api
