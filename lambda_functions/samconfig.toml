@@ -1,0 +1,19 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "neurodiverse-job-quest"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-<unique-id>"  # This will be auto-filled by SAM CLI
+s3_prefix = "neurodiverse-job-quest"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = []
+image_repositories = []
+confirm_changeset = true
+fail_on_empty_changeset = false
+
+[default.build]
+[default.build.parameters]
+use_container = true
+cached = true
+parallel = true 

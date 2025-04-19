@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Neurodiverse Job Quest API
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: python3.11
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        OPENAI_API_KEY: !Ref OpenAIApiKey
+        AWS_REGION: !Ref AWS::Region
+        LANGTRACE_API_KEY: !Ref LangTraceApiKey
+        AWS_ACCESS_KEY_ID: !Ref AWSAccessKeyId
+        AWS_SECRET_ACCESS_KEY: !Ref AWSSecretAccessKey
+        API_GATEWAY_URL: !Sub "https://${NeurodiverseJobQuestApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+
+Parameters:
+  OpenAIApiKey:
+    Type: String
+    Description: OpenAI API Key
+    NoEcho: true
+  
+  LangTraceApiKey:
+    Type: String
+    Description: LangTrace API Key
+    NoEcho: true
+  
+  AWSAccessKeyId:
+    Type: String
+    Description: AWS Access Key ID
+    NoEcho: true
+  
+  AWSSecretAccessKey:
+    Type: String
+    Description: AWS Secret Access Key
+    NoEcho: true
+
+Resources:
+  # DynamoDB Table - Now created by the initialization Lambda
+  AssessmentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Assessments
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+  # API Gateway
+  NeurodiverseJobQuestApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+        AllowOrigin: "'*'"
+
+  # Lambda Functions
+  InitFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: app_init.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AssessmentsTable
+        - DynamoDBTablePolicy:
+            TableName: !Ref AssessmentsTable
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref AssessmentsTable
+
+  QuestionnaireFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: questionnaire_api.handler
+      Events:
+        GetQuestionnaire:
+          Type: Api
+          Properties:
+            RestApiId: !Ref NeurodiverseJobQuestApi
+            Path: /questionnaire
+            Method: GET
+        SubmitQuestionnaire:
+          Type: Api
+          Properties:
+            RestApiId: !Ref NeurodiverseJobQuestApi
+            Path: /submit_questionnaire
+            Method: POST
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AssessmentsTable
+      DependsOn: InitFunction
+
+  ResultsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: results_api.handler
+      Events:
+        GetResults:
+          Type: Api
+          Properties:
+            RestApiId: !Ref NeurodiverseJobQuestApi
+            Path: /results/{assessment_id}
+            Method: GET
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AssessmentsTable
+        - AWSLambdaBasicExecutionRole
+      DependsOn: InitFunction
+
+  FrontendProxyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: frontend_proxy.handler
+      Events:
+        ProxyAPI:
+          Type: Api
+          Properties:
+            RestApiId: !Ref NeurodiverseJobQuestApi
+            Path: /api/{proxy+}
+            Method: ANY
+        HealthCheck:
+          Type: Api
+          Properties:
+            RestApiId: !Ref NeurodiverseJobQuestApi
+            Path: /health
+            Method: GET
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      Environment:
+        Variables:
+          API_GATEWAY_URL: !Sub "https://${NeurodiverseJobQuestApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+
+Outputs:
+  InitFunction:
+    Description: "Initialization Lambda Function ARN"
+    Value: !GetAtt InitFunction.Arn
+
+  QuestionnaireFunction:
+    Description: "Questionnaire Lambda Function ARN"
+    Value: !GetAtt QuestionnaireFunction.Arn
+
+  ResultsFunction:
+    Description: "Results Lambda Function ARN"
+    Value: !GetAtt ResultsFunction.Arn
+
+  FrontendProxyFunction:
+    Description: "Frontend Proxy Lambda Function ARN"
+    Value: !GetAtt FrontendProxyFunction.Arn
+
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${NeurodiverseJobQuestApi}.execute-api.${AWS::Region}.amazonaws.com/prod/"
+
+  DynamoDBTable:
+    Description: "DynamoDB table name"
+    Value: !Ref AssessmentsTable 
